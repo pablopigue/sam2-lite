@@ -16,3 +16,4 @@ non_overlap_masks: true
 score_thresh: 0.0
 
 out_dir: outputs/vos/${model.name}_${split}
+skip_inference: false   # true = only evaluate + log the predictions already in out_dir

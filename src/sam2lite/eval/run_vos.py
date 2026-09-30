@@ -1,4 +1,4 @@
-"""Semi-supervised VOS inference on DAVIS 2017: first-frame GT masks -> propagate -> PNGs.
+"""Semi-supervised VOS on DAVIS 2017: first-frame GT masks -> propagate -> PNGs -> J&F -> MLflow.
 
 Mirrors `vos_inference` in tools/vos_inference.py (SAM 2 repo): all objects of a video are
 tracked together from their frame-0 masks, and predictions are saved as palette PNGs with the
@@ -13,6 +13,7 @@ import argparse
 import time
 from pathlib import Path
 
+import mlflow
 import torch
 from omegaconf import DictConfig, OmegaConf
 from sam2.build_sam import build_sam2_video_predictor
@@ -27,6 +28,8 @@ from sam2lite.data.davis import (
     save_annotation,
     split_objects,
 )
+from sam2lite.eval.jf import evaluate
+from sam2lite.tracking import start_run
 
 
 def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
@@ -78,17 +81,14 @@ def load_config() -> DictConfig:
     parser.add_argument("--config", type=Path, default=Path("configs/eval/davis_val.yaml"))
     args, overrides = parser.parse_known_args()  # the rest are OmegaConf `key=value` overrides
     cfg = OmegaConf.merge(OmegaConf.load(args.config), OmegaConf.from_dotlist(overrides))
+    assert isinstance(cfg, DictConfig), f"{args.config} must be a YAML mapping"
     OmegaConf.resolve(cfg)
     return cfg
 
 
-def main() -> None:
-    cfg = load_config()
-    print(OmegaConf.to_yaml(cfg))
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def run_inference(cfg: DictConfig, videos: list[str], device: str) -> dict[str, float]:
+    """Predict masks for `videos` into cfg.out_dir; return timing metrics."""
     davis_root, out_dir = Path(cfg.davis_root), Path(cfg.out_dir)
-    videos = list(cfg.videos) if cfg.videos else list_videos(davis_root, cfg.split)
-
     predictor = build_predictor(cfg, device)
     total_frames, start = 0, time.perf_counter()
     # bf16 autocast on GPU, as in the official evaluation; full precision on CPU.
@@ -96,9 +96,33 @@ def main() -> None:
         for n, video in enumerate(videos, start=1):
             print(f"[{n}/{len(videos)}] {video}")
             total_frames += predict_video(predictor, davis_root, video, out_dir, cfg.score_thresh)
-
     elapsed = time.perf_counter() - start
-    print(f"Done: {len(videos)} videos, {total_frames} frames in {elapsed:.0f}s -> {out_dir}")
+    print(f"Inference: {len(videos)} videos, {total_frames} frames in {elapsed:.0f}s -> {out_dir}")
+    return {"inference_seconds": elapsed, "frames": float(total_frames)}
+
+
+def main() -> None:
+    cfg = load_config()
+    if cfg.model.name != "teacher":
+        # Guard: until the student exists, a "student" run would silently use the teacher weights.
+        raise NotImplementedError(f"model.name={cfg.model.name!r}: only 'teacher' is supported")
+    print(OmegaConf.to_yaml(cfg))
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    davis_root, out_dir = Path(cfg.davis_root), Path(cfg.out_dir)
+    videos = list(cfg.videos) if cfg.videos else list_videos(davis_root, cfg.split)
+
+    with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}", cfg=cfg):
+        mlflow.set_tags({"device": device, "n_videos": str(len(videos))})
+        if cfg.skip_inference:  # reuse predictions already in out_dir (no timing metrics)
+            print(f"Skipping inference, evaluating existing predictions in {out_dir}")
+        else:
+            mlflow.log_metrics(run_inference(cfg, videos, device))
+
+        scores = evaluate(davis_root, out_dir, videos)
+        mlflow.log_metrics(scores)
+        mlflow.log_artifact(str(out_dir / "results.csv"))  # per-object J and F
+        summary = "  ".join(f"{name}={value:.1f}" for name, value in scores.items())
+        print(f"{cfg.split} ({len(videos)} videos): {summary}")
 
 
 if __name__ == "__main__":

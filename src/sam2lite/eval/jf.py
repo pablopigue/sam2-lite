@@ -30,14 +30,17 @@ def check_predictions(davis_root: Path, pred_dir: Path, videos: list[str]) -> No
 def evaluate(
     davis_root: Path, pred_dir: Path, videos: list[str], num_processes: int = 8
 ) -> dict[str, float]:
-    """Return {"J&F", "J", "F"} averaged over all objects of `videos`, in [0, 100]."""
+    """Return {"JF", "J", "F"} averaged over all objects of `videos`, in [0, 100].
+
+    "JF" stands for J&F: MLflow metric names cannot contain "&".
+    """
     check_predictions(davis_root, pred_dir, videos)
     gt_root = davis_root / "Annotations" / RESOLUTION
     # strict=False because gt_root also holds the train videos; check_predictions covers the rest.
     jf, j, f, _ = benchmark(
         [str(gt_root)], [str(pred_dir)], strict=False, num_processes=num_processes, verbose=False
     )
-    return {"J&F": float(jf[0]), "J": float(j[0]), "F": float(f[0])}
+    return {"JF": float(jf[0]), "J": float(j[0]), "F": float(f[0])}
 
 
 def main() -> None:
