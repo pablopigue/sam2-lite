@@ -1,8 +1,11 @@
-.PHONY: setup lint format test
+.PHONY: setup checkpoints lint format test
 
 setup:  ## Install the locked environment and the git hooks
 	uv sync
 	uv run pre-commit install
+
+checkpoints:  ## Download and verify the SAM 2.1 teacher weights
+	./scripts/download_checkpoints.sh
 
 lint:  ## Check style without modifying files (used by CI)
 	uv run ruff check .
