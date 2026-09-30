@@ -1,0 +1,18 @@
+# Semi-supervised VOS on DAVIS 2017 val, following tools/vos_inference.py from the SAM 2 repo.
+# Override any key from the CLI, e.g.:  videos=[blackswan,india] out_dir=outputs/smoke
+
+davis_root: data/raw/DAVIS
+split: val
+videos: null            # null = every video in the split; a list = only those (smoke tests)
+
+model:
+  name: teacher
+  config: configs/sam2.1/sam2.1_hiera_t.yaml   # resolved inside the installed sam2 package
+  checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+
+# Same settings as the official SAM 2 evaluation (no hole filling, one PNG per frame).
+apply_postprocessing: false
+non_overlap_masks: true
+score_thresh: 0.0
+
+out_dir: outputs/vos/${model.name}_${split}

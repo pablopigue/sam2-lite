@@ -1,3 +1,6 @@
+# Vendored third-party code is kept byte-identical to upstream: no hook may modify it.
+exclude: ^src/sam2lite/eval/third_party/
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.9  # keep in sync with the ruff version in uv.lock
