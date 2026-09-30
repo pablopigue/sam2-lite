@@ -1,0 +1,26 @@
+# Per-frame latency of the image encoder alone and of the full video pipeline.
+# Override from the CLI, e.g.:  devices=[cpu] cpu_threads=[2] iters.cpu=5
+
+model:
+  name: teacher
+  config: configs/sam2.1/sam2.1_hiera_t.yaml
+  checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+
+# Same predictor settings as the evaluation (configs/eval/davis_val.yaml).
+apply_postprocessing: false
+non_overlap_masks: true
+
+devices: [cuda, cpu]
+# i7-13620H: 6 performance cores (12 threads) + 4 efficiency cores. 6 threads keeps the work on
+# the P-cores; 2 threads approximates a free Hugging Face CPU Space (2 vCPU).
+cpu_threads: [6, 2]
+
+image_size: 1024
+# The pipeline is timed frame by frame on a real video. The first frames are warmup: besides the
+# usual one-off costs, the memory bank fills up during the first num_maskmem (= 7) frames.
+davis_root: data/raw/DAVIS
+pipeline_video: cows      # longest val video (104 frames): room for warmup + iters + 1
+warmup: 10
+iters:
+  cuda: 50
+  cpu: 20

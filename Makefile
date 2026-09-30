@@ -1,4 +1,7 @@
-.PHONY: setup checkpoints lint format test
+.PHONY: setup checkpoints lint format test eval bench
+
+MODEL ?= teacher
+SKIP_INFERENCE ?= false
 
 setup:  ## Install the locked environment and the git hooks
 	uv sync
@@ -17,3 +20,10 @@ format:  ## Auto-fix lint issues and format the code
 
 test:
 	uv run pytest
+
+eval:  ## DAVIS 2017 val: inference + J&F, logged to MLflow (SKIP_INFERENCE=true reuses predictions)
+	uv run python -m sam2lite.eval.run_vos --config configs/eval/davis_val.yaml \
+		model.name=$(MODEL) skip_inference=$(SKIP_INFERENCE)
+
+bench:  ## Per-frame latency (encoder and full pipeline, GPU and CPU), logged to MLflow
+	uv run python -m sam2lite.bench.latency --config configs/bench/latency.yaml
