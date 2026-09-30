@@ -1,0 +1,38 @@
+# Datos, pesos y resultados (nunca a git)
+data/
+checkpoints/
+outputs/
+mlruns/
+mlflow.db
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Secretos
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Herramientas
+.ruff_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# Configuración personal de Claude Code (solo en local)
+.claude/
+CLAUDE.md
+
+# Documentación de trabajo (local hasta el final del proyecto)
+docs/
+
+# Sistema
+.DS_Store
