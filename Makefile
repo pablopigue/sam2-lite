@@ -3,6 +3,7 @@
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
 SKIP_INFERENCE ?= false
+CKPT ?=
 
 setup:  ## Install the locked environment and the git hooks
 	uv sync
@@ -24,7 +25,7 @@ test:
 
 eval:  ## DAVIS 2017 val: inference + J&F, logged to MLflow (SKIP_INFERENCE=true reuses predictions)
 	uv run python -m sam2lite.eval.run_vos --config configs/eval/davis_val.yaml \
-		model.name=$(MODEL) skip_inference=$(SKIP_INFERENCE)
+		model.name=$(MODEL) skip_inference=$(SKIP_INFERENCE) $(if $(CKPT),model.ckpt=$(CKPT))
 
 bench:  ## Per-frame latency (encoder + full pipeline; student: encoder only), logged to MLflow
 	uv run python -m sam2lite.bench.latency --config configs/bench/latency.yaml model.name=$(MODEL)

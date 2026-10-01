@@ -6,9 +6,11 @@ split: val
 videos: null            # null = every video in the split; a list = only those (smoke tests)
 
 model:
-  name: teacher
+  name: teacher                                # teacher | student
   config: configs/sam2.1/sam2.1_hiera_t.yaml   # resolved inside the installed sam2 package
-  checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+  checkpoint: checkpoints/sam2.1_hiera_tiny.pt # memory + decoder (and teacher encoder) weights
+  ckpt: null                                   # student only: distillation checkpoint (best.pt)
+student_config: configs/model/student_mnv4.yaml
 
 # Same settings as the official SAM 2 evaluation (no hole filling, one PNG per frame).
 apply_postprocessing: false

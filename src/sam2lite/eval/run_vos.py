@@ -29,19 +29,47 @@ from sam2lite.data.davis import (
     split_objects,
 )
 from sam2lite.eval.jf import evaluate
+from sam2lite.models.student import build_student
 from sam2lite.tracking import start_run
 
 
 def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
-    """SAM 2.1 video predictor configured like the official VOS evaluation."""
+    """SAM 2.1 video predictor configured like the official VOS evaluation.
+
+    With model.name == "student", the teacher's image encoder is replaced by the distilled
+    student; memory attention, memory encoder and mask decoder stay SAM 2.1-tiny's.
+    """
     overrides = [f"++model.non_overlap_masks={str(cfg.non_overlap_masks).lower()}"]
-    return build_sam2_video_predictor(
+    predictor = build_sam2_video_predictor(
         config_file=cfg.model.config,
         ckpt_path=cfg.model.checkpoint,
         device=device,
         apply_postprocessing=cfg.apply_postprocessing,
         hydra_overrides_extra=overrides,
     )
+    if cfg.model.name == "student":
+        use_student_encoder(predictor, OmegaConf.load(cfg.student_config), cfg.model.ckpt, device)
+    return predictor
+
+
+def use_student_encoder(
+    predictor: SAM2VideoPredictor, student_cfg: DictConfig, ckpt_path: str, device: str
+) -> None:
+    """Replace predictor.image_encoder by the distilled student loaded from `ckpt_path`.
+
+    `ckpt_path` is a distillation checkpoint (step_*.pt or best.pt): a dict whose "student" key
+    holds the student's state_dict.
+    """
+    # pretrained=False: the ImageNet weights would be overwritten anyway, so don't download them.
+    cfg = OmegaConf.merge(student_cfg, {"pretrained": False})
+    assert isinstance(cfg, DictConfig)
+    student = build_student(cfg)
+    # Load on CPU (the checkpoint may also hold CPU-only state); strict=True catches a checkpoint
+    # from a different architecture instead of silently loading part of it.
+    state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    student.load_state_dict(state["student"], strict=True)
+    # eval(): BatchNorm must use its stored statistics at inference, not per-batch ones.
+    predictor.image_encoder = student.to(device).eval()
 
 
 @torch.inference_mode()
@@ -90,6 +118,14 @@ def run_inference(cfg: DictConfig, videos: list[str], device: str) -> dict[str, 
     """Predict masks for `videos` into cfg.out_dir; return timing metrics."""
     davis_root, out_dir = Path(cfg.davis_root), Path(cfg.out_dir)
     predictor = build_predictor(cfg, device)
+    # Record which encoder actually ran (teacher 27.2 M vs student 7.5 M): guards against
+    # evaluating the teacher by mistake under a "student" label.
+    encoder_params = sum(p.numel() for p in predictor.image_encoder.parameters())
+    mlflow.set_tag("encoder_params_M", f"{encoder_params / 1e6:.2f}")
+    print(
+        f"Image encoder: {type(predictor.image_encoder.trunk).__name__}, "
+        f"{encoder_params / 1e6:.2f} M params"
+    )
     total_frames, start = 0, time.perf_counter()
     # bf16 autocast on GPU, as in the official evaluation; full precision on CPU.
     with torch.autocast(device, dtype=torch.bfloat16, enabled=device == "cuda"):
@@ -103,9 +139,8 @@ def run_inference(cfg: DictConfig, videos: list[str], device: str) -> dict[str, 
 
 def main() -> None:
     cfg = load_config()
-    if cfg.model.name != "teacher":
-        # Guard: until the student exists, a "student" run would silently use the teacher weights.
-        raise NotImplementedError(f"model.name={cfg.model.name!r}: only 'teacher' is supported")
+    if cfg.model.name == "student" and not cfg.model.ckpt:
+        raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
     print(OmegaConf.to_yaml(cfg))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     davis_root, out_dir = Path(cfg.davis_root), Path(cfg.out_dir)
