@@ -1,0 +1,14 @@
+# Plan A acceptance thresholds, fixed BEFORE the final results.
+# Decided on principle (quality/speed trade-off), not tuned to make the student pass. See docs D-020.
+
+teacher:
+  jf_davis_val: 89.1          # MLflow run b44efdd1 (SAM 2.1 Hiera-T, DAVIS 2017 val, 30 videos)
+
+quality:
+  max_jf_drop: 5.0            # student J&F >= teacher - 5.0 = 84.1 on DAVIS 2017 val (full)
+
+speed:                         # measured locally with configs/bench/latency.yaml, never in CI
+  min_pipeline_speedup_cpu6t: 1.25   # teacher / student median ms per frame, full pipeline, 6 threads
+
+# The CI eval gate (Day 10) runs a mini-evaluation on 2-3 short DAVIS val videos; its threshold
+# will be derived from the teacher's score on those same videos with the same max_jf_drop.
