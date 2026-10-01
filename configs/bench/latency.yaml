@@ -2,9 +2,10 @@
 # Override from the CLI, e.g.:  devices=[cpu] cpu_threads=[2] iters.cpu=5
 
 model:
-  name: teacher             # teacher | student (student: encoder only until Day 5)
+  name: teacher             # teacher | student
   config: configs/sam2.1/sam2.1_hiera_t.yaml
   checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+  ckpt: null                # student only: distillation checkpoint (best.pt)
 student_config: configs/model/student_mnv4.yaml
 
 # Same predictor settings as the evaluation (configs/eval/davis_val.yaml).

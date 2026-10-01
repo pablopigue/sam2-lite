@@ -27,8 +27,9 @@ eval:  ## DAVIS 2017 val: inference + J&F, logged to MLflow (SKIP_INFERENCE=true
 	uv run python -m sam2lite.eval.run_vos --config configs/eval/davis_val.yaml \
 		model.name=$(MODEL) skip_inference=$(SKIP_INFERENCE) $(if $(CKPT),model.ckpt=$(CKPT))
 
-bench:  ## Per-frame latency (encoder + full pipeline; student: encoder only), logged to MLflow
-	uv run python -m sam2lite.bench.latency --config configs/bench/latency.yaml model.name=$(MODEL)
+bench:  ## Per-frame latency (encoder + full pipeline, GPU and CPU), logged to MLflow
+	uv run python -m sam2lite.bench.latency --config configs/bench/latency.yaml \
+		model.name=$(MODEL) $(if $(CKPT),model.ckpt=$(CKPT))
 
 train:  ## Distillation (resumes automatically from the last checkpoint of the run)
 	uv run python -m sam2lite.train.distill --config $(CONFIG)

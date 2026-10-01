@@ -23,7 +23,6 @@ from torch import nn
 
 from sam2lite.data.davis import annotation_paths, frame_paths, load_annotation, split_objects
 from sam2lite.eval.run_vos import build_predictor
-from sam2lite.models.student import build_student
 from sam2lite.tracking import start_run
 
 
@@ -100,6 +99,8 @@ def hardware_tags() -> dict[str, str]:
 def main() -> None:
     cfg = load_config()
     if cfg.model.name == "student":
+        if not cfg.model.ckpt:
+            raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
         cfg.student = OmegaConf.load(cfg.student_config)  # logged with the run's params
     with start_run("latency", run_name=cfg.model.name, cfg=cfg):
         mlflow.set_tags(hardware_tags())
@@ -133,13 +134,10 @@ def benchmark(cfg: DictConfig) -> list[tuple[str, int | None, str, dict[str, flo
 
 
 def build_workloads(cfg: DictConfig, device: str) -> dict[str, Callable[[], object]]:
-    if cfg.model.name == "student":
-        # Encoder only: the full student pipeline needs the student inside the video
-        # predictor (Day 5), so it is not measured yet.
-        print("Student: measuring the encoder only (pipeline not available yet)")
-        encoder = build_student(cfg.student).to(device).eval()
-        return {"encoder": encoder_workload(encoder, device, cfg.image_size)}
+    # Same predictor as the evaluation: with model.name=student, the distilled encoder replaces
+    # Hiera and memory + decoder stay SAM 2.1-tiny's, so both models run the same workloads.
     predictor = build_predictor(cfg, device)
+    print(f"Image encoder: {type(predictor.image_encoder.trunk).__name__}")
     return {
         "encoder": encoder_workload(predictor.image_encoder, device, cfg.image_size),
         "pipeline": pipeline_workload(predictor, Path(cfg.davis_root), cfg.pipeline_video),
