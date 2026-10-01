@@ -19,9 +19,11 @@ import numpy as np
 import torch
 from omegaconf import DictConfig, OmegaConf
 from sam2.sam2_video_predictor import SAM2VideoPredictor
+from torch import nn
 
 from sam2lite.data.davis import annotation_paths, frame_paths, load_annotation, split_objects
 from sam2lite.eval.run_vos import build_predictor
+from sam2lite.models.student import build_student
 from sam2lite.tracking import start_run
 
 
@@ -51,10 +53,10 @@ def summarize(times_ms: np.ndarray) -> dict[str, float]:
     }
 
 
-def encoder_workload(predictor: SAM2VideoPredictor, image_size: int) -> Callable[[], object]:
-    """One forward of the image encoder on a single preprocessed-size frame."""
-    x = torch.randn(1, 3, image_size, image_size, device=predictor.device)
-    return lambda: predictor.image_encoder(x)
+def encoder_workload(encoder: nn.Module, device: str, image_size: int) -> Callable[[], object]:
+    """One forward of an image encoder (teacher or student) on a single preprocessed-size frame."""
+    x = torch.randn(1, 3, image_size, image_size, device=device)
+    return lambda: encoder(x)
 
 
 def pipeline_workload(
@@ -97,6 +99,8 @@ def hardware_tags() -> dict[str, str]:
 @torch.inference_mode()
 def main() -> None:
     cfg = load_config()
+    if cfg.model.name == "student":
+        cfg.student = OmegaConf.load(cfg.student_config)  # logged with the run's params
     with start_run("latency", run_name=cfg.model.name, cfg=cfg):
         mlflow.set_tags(hardware_tags())
         results = benchmark(cfg)
@@ -119,21 +123,27 @@ def benchmark(cfg: DictConfig) -> list[tuple[str, int | None, str, dict[str, flo
         for threads in thread_counts:
             if threads is not None:
                 torch.set_num_threads(threads)
-            predictor = build_predictor(cfg, device)
             iters = cfg.iters[device]
             # bf16 on GPU (as in evaluation); fp32 on CPU (the deployment target).
             with torch.autocast(device, dtype=torch.bfloat16, enabled=device == "cuda"):
-                workloads = {
-                    "encoder": encoder_workload(predictor, cfg.image_size),
-                    "pipeline": pipeline_workload(
-                        predictor, Path(cfg.davis_root), cfg.pipeline_video
-                    ),
-                }
-                for name, fn in workloads.items():
+                for name, fn in build_workloads(cfg, device).items():
                     stats = summarize(time_calls(fn, device, cfg.warmup, iters))
                     results.append((device, threads, name, stats))
-            del predictor
     return results
+
+
+def build_workloads(cfg: DictConfig, device: str) -> dict[str, Callable[[], object]]:
+    if cfg.model.name == "student":
+        # Encoder only: the full student pipeline needs the student inside the video
+        # predictor (Day 5), so it is not measured yet.
+        print("Student: measuring the encoder only (pipeline not available yet)")
+        encoder = build_student(cfg.student).to(device).eval()
+        return {"encoder": encoder_workload(encoder, device, cfg.image_size)}
+    predictor = build_predictor(cfg, device)
+    return {
+        "encoder": encoder_workload(predictor.image_encoder, device, cfg.image_size),
+        "pipeline": pipeline_workload(predictor, Path(cfg.davis_root), cfg.pipeline_video),
+    }
 
 
 def format_table(cfg: DictConfig, results: list) -> str:
