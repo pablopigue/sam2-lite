@@ -173,7 +173,7 @@ def main() -> None:
         lambda s: lr_factor(s, sched.warmup_steps, sched.total_steps, sched.min_lr_ratio),
     )
 
-    start_step, run_id = 0, None
+    start_step, run_id, best_val = 0, None, math.inf
     ckpt_path = latest_checkpoint(cfg)
     if ckpt_path is not None:
         # Load on CPU: the RNG state must stay a CPU tensor; load_state_dict moves the rest.
@@ -183,6 +183,7 @@ def main() -> None:
         scheduler.load_state_dict(state["scheduler"])
         torch.set_rng_state(state["torch_rng"])
         start_step, run_id = state["step"], state["mlflow_run_id"]
+        best_val = state.get("best_val", math.inf)
         print(f"Resuming from {ckpt_path} (step {start_step})")
 
     train_iter, val_loader = build_loaders(cfg, start_step)
@@ -212,6 +213,13 @@ def main() -> None:
                 val = evaluate(teacher, student, val_loader, weights, cfg.freeze_bn)
                 mlflow.log_metrics({f"val/{k}": v for k, v in val.items()}, step=done)
                 print(f"step {done} val loss {val['loss']:.5f}")
+                if val["loss"] < best_val:  # selected on the held-out TRAIN videos, never DAVIS val
+                    best_val = val["loss"]
+                    best = {"step": done, "val_loss": best_val, "student": student.state_dict()}
+                    Path(cfg.checkpoint.dir).mkdir(parents=True, exist_ok=True)
+                    torch.save(best, Path(cfg.checkpoint.dir) / "best.pt")
+                    mlflow.log_metric("best_val_loss", best_val, step=done)
+                    print(f"new best val loss: {best_val:.5f} (step {done}) -> best.pt")
             if done % cfg.checkpoint.every == 0 or done == sched.total_steps:
                 save_checkpoint(
                     cfg,
@@ -223,6 +231,7 @@ def main() -> None:
                         "scheduler": scheduler.state_dict(),
                         "torch_rng": torch.get_rng_state(),
                         "mlflow_run_id": run.info.run_id,
+                        "best_val": best_val,
                         "config": OmegaConf.to_container(cfg, resolve=True),
                     },
                 )

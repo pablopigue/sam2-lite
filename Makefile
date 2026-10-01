@@ -1,6 +1,7 @@
-.PHONY: setup checkpoints lint format test eval bench
+.PHONY: setup checkpoints lint format test eval bench train
 
 MODEL ?= teacher
+CONFIG ?= configs/train/smoke.yaml
 SKIP_INFERENCE ?= false
 
 setup:  ## Install the locked environment and the git hooks
@@ -27,3 +28,6 @@ eval:  ## DAVIS 2017 val: inference + J&F, logged to MLflow (SKIP_INFERENCE=true
 
 bench:  ## Per-frame latency (encoder + full pipeline; student: encoder only), logged to MLflow
 	uv run python -m sam2lite.bench.latency --config configs/bench/latency.yaml model.name=$(MODEL)
+
+train:  ## Distillation (resumes automatically from the last checkpoint of the run)
+	uv run python -m sam2lite.train.distill --config $(CONFIG)
