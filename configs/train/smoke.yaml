@@ -1,0 +1,47 @@
+# Smoke test of the distillation loop: few images, few steps. Checks that the loss goes down,
+# that training resumes from a checkpoint, and measures images/s and VRAM for the night run.
+
+run_name: smoke
+seed: 0
+device: cuda
+
+data:
+  manifest: data/manifest.csv
+  image_size: 1024
+  num_workers: 4
+  max_train_images: 100      # null = every train frame of the manifest
+  max_val_images: 40
+  augment:
+    crop_scale_min: 0.6
+    hflip_p: 0.5
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.2
+
+teacher:
+  config: configs/sam2.1/sam2.1_hiera_t.yaml
+  checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+student_config: configs/model/student_mnv4.yaml
+
+loss:
+  weights: [1.0, 1.0, 1.0]   # per backbone_fpn level (strides 4, 8, 16); see docs D-018
+
+batch_size: 2                # micro-batch that fits in 8 GB of VRAM
+grad_accum: 4                # effective batch = batch_size * grad_accum = 8
+grad_clip: 1.0               # max global gradient norm
+freeze_bn: true              # keep pretrained BatchNorm statistics (micro-batches of 2); D-019
+
+optim:
+  lr: 5.0e-4
+  weight_decay: 0.05
+schedule:
+  total_steps: 50            # optimizer steps (each = grad_accum micro-batches)
+  warmup_steps: 10
+  min_lr_ratio: 0.01         # final lr = lr * min_lr_ratio
+
+log_every: 5
+eval_every: 25
+checkpoint:
+  dir: checkpoints/distill/${run_name}
+  every: 25
+  keep_last: 2

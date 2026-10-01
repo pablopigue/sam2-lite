@@ -6,3 +6,4 @@ backbone: mobilenetv4_conv_medium.e500_r224_in1k
 pretrained: true
 out_indices: [1, 2, 3, 4]    # strides 4, 8, 16, 32 (drop the stride-2 level)
 teacher_config: configs/sam2.1/sam2.1_hiera_t.yaml  # inside the installed sam2 package
+neck_init_scale: 0.01        # shrink the random neck's initial outputs to the teacher's scale

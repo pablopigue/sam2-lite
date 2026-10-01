@@ -36,10 +36,21 @@ def git_state() -> dict[str, str]:
 
 
 @contextmanager
-def start_run(experiment: str, run_name: str, cfg: DictConfig) -> Iterator[mlflow.ActiveRun]:
-    """Open an MLflow run that logs `cfg` (as params and as config.yaml) and the git state."""
+def start_run(
+    experiment: str, run_name: str, cfg: DictConfig, run_id: str | None = None
+) -> Iterator[mlflow.ActiveRun]:
+    """Open an MLflow run that logs `cfg` (as params and as config.yaml) and the git state.
+
+    With `run_id`, an existing run is resumed (e.g. training restarted from a checkpoint):
+    its params are already logged, so only the git state of the resumed process is added.
+    """
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
     mlflow.set_experiment(experiment)
+    if run_id is not None:
+        with mlflow.start_run(run_id=run_id) as run:
+            mlflow.set_tags({f"resumed_{k}": v for k, v in git_state().items()})
+            yield run
+        return
     with mlflow.start_run(run_name=run_name) as run:
         container = OmegaConf.to_container(cfg, resolve=True)
         assert isinstance(container, dict)

@@ -5,13 +5,15 @@ If a change breaks this test, the change is wrong: SAM 2's memory and decoder co
 outputs unchanged. Both models use random weights (no downloads, runs in CI).
 """
 
+import copy
+
 import pytest
 import torch
 from omegaconf import OmegaConf
 from sam2.build_sam import build_sam2
 from sam2.modeling.backbones.image_encoder import ImageEncoder
 
-from sam2lite.models.student import build_student
+from sam2lite.models.student import build_student, scale_neck_init, set_train_mode
 
 IMAGE_SIZE = 1024
 STUDENT_CONFIG = "configs/model/student_mnv4.yaml"
@@ -54,6 +56,28 @@ def test_student_positional_encoding_equals_teacher(
     with torch.inference_mode():
         t_pos, s_pos = teacher(x)["vision_pos_enc"], student(x)["vision_pos_enc"]
     assert all(torch.equal(s, t) for s, t in zip(s_pos, t_pos, strict=True))
+
+
+def test_scale_neck_init_shrinks_lateral_convs(student: ImageEncoder) -> None:
+    """Lateral conv weights are scaled exactly and biases zeroed (see neck_init_scale)."""
+    neck = copy.deepcopy(student.neck)
+    before = [lateral.conv.weight.clone() for lateral in neck.convs]
+    scale_neck_init(neck, 0.5)
+    for lateral, weight in zip(neck.convs, before, strict=True):
+        torch.testing.assert_close(lateral.conv.weight, weight * 0.5)
+        assert torch.all(lateral.conv.bias == 0)
+
+
+def test_frozen_bn_keeps_running_stats(student: ImageEncoder) -> None:
+    """In train mode with freeze_bn, a forward pass must not touch BatchNorm statistics."""
+    model = copy.deepcopy(student)
+    set_train_mode(model, freeze_bn=True)
+    bns = [m for m in model.modules() if isinstance(m, torch.nn.modules.batchnorm._BatchNorm)]
+    assert bns and model.training and not any(bn.training for bn in bns)
+    before = [bn.running_var.clone() for bn in bns]
+    with torch.no_grad():
+        model(torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE))
+    assert all(torch.equal(bn.running_var, b) for bn, b in zip(bns, before, strict=True))
 
 
 def test_student_neck_matches_teacher_hyperparameters(

@@ -53,4 +53,34 @@ def build_student(cfg: DictConfig) -> ImageEncoder:
         fpn_top_down_levels=list(neck_cfg.fpn_top_down_levels),
         fpn_interp_model=neck_cfg.fpn_interp_model,
     )
+    scale_neck_init(neck, cfg.neck_init_scale)
     return ImageEncoder(trunk=trunk, neck=neck, scalp=teacher_encoder.scalp)
+
+
+def set_train_mode(model: nn.Module, freeze_bn: bool) -> None:
+    """model.train(), optionally keeping every BatchNorm in eval mode (frozen statistics).
+
+    With micro-batches of 2 images, BatchNorm's running statistics drift: channels that are ~0
+    on the training images get running_var -> ~0, and in eval mode a rare image that activates
+    them is amplified by 1/sqrt(eps) ~ 300x per layer. Frozen BN keeps the pretrained ImageNet
+    statistics (its affine weight and bias still train) and makes train and eval behave alike.
+    """
+    model.train()
+    if freeze_bn:
+        for module in model.modules():
+            if isinstance(module, nn.modules.batchnorm._BatchNorm):
+                module.eval()
+
+
+@torch.no_grad()
+def scale_neck_init(neck: FpnNeck, scale: float) -> None:
+    """Shrink the new neck's initial outputs towards the teacher's feature scale.
+
+    The timm features have std ~3-8 and the default conv init keeps that scale, so an untrained
+    student outputs features ~100-1000x larger than the teacher's (E[x^2] ~0.002-0.09). Scaling
+    the lateral convs down (not to exactly zero, so gradients still reach the backbone) makes
+    training start near the "predict zeros" loss instead of far above it.
+    """
+    for lateral in neck.convs:
+        lateral.conv.weight.mul_(scale)
+        lateral.conv.bias.zero_()
