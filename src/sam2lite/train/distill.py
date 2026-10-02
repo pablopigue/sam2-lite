@@ -17,6 +17,7 @@ from pathlib import Path
 import mlflow
 import numpy as np
 import torch
+import torch.nn.functional as F
 from omegaconf import DictConfig, OmegaConf
 from sam2.build_sam import build_sam2
 from sam2.modeling.backbones.image_encoder import ImageEncoder
@@ -29,10 +30,26 @@ from sam2lite.tracking import start_run
 from sam2lite.train.losses import distillation_loss
 
 
+def split_images(batch) -> tuple[torch.Tensor, torch.Tensor]:
+    """(teacher images, student images) on the GPU; the same tensor when resolutions match."""
+    if isinstance(batch, (list, tuple)):
+        return batch[0].cuda(non_blocking=True), batch[1].cuda(non_blocking=True)
+    images = batch.cuda(non_blocking=True)
+    return images, images
+
+
+def match_student_grid(t_fpn, s_fpn) -> list[torch.Tensor]:
+    """Teacher features area-averaged to the student's (smaller) grid, level by level."""
+    return [
+        t if t.shape[-2:] == s.shape[-2:] else F.adaptive_avg_pool2d(t.float(), s.shape[-2:])
+        for t, s in zip(t_fpn, s_fpn, strict=True)
+    ]
+
+
 def train_step(
     teacher: ImageEncoder,
     student: ImageEncoder,
-    micro_batches: list[torch.Tensor],
+    micro_batches: list,
     optimizer: torch.optim.Optimizer,
     weights: list[float],
     grad_clip: float,
@@ -40,12 +57,15 @@ def train_step(
     """One optimizer step over `micro_batches` (gradient accumulation); return mean losses."""
     accum = len(micro_batches)
     sums: dict[str, float] = {}
-    for images in micro_batches:
+    for batch in micro_batches:
+        t_images, s_images = split_images(batch)
         # Teacher: frozen and without autograd graph (its activations are not kept in VRAM).
         with torch.no_grad(), torch.autocast("cuda", dtype=torch.bfloat16):
-            t_fpn = teacher(images)["backbone_fpn"]
+            t_fpn = teacher(t_images)["backbone_fpn"]
         with torch.autocast("cuda", dtype=torch.bfloat16):
-            s_fpn = student(images)["backbone_fpn"]
+            s_fpn = student(s_images)["backbone_fpn"]
+        with torch.no_grad():
+            t_fpn = match_student_grid(t_fpn, s_fpn)
         total, per_level = distillation_loss(s_fpn, t_fpn, weights)
         # Divide by accum so the K accumulated gradients add up to the mean, like one big batch.
         (total / accum).backward()
@@ -71,11 +91,12 @@ def evaluate(
     """Mean distillation loss on the held-out videos (no augmentation, no gradients)."""
     student.eval()
     sums: dict[str, float] = {}
-    for images in loader:
-        images = images.cuda(non_blocking=True)
+    for batch in loader:
+        t_images, s_images = split_images(batch)
         with torch.autocast("cuda", dtype=torch.bfloat16):
-            t_fpn = teacher(images)["backbone_fpn"]
-            s_fpn = student(images)["backbone_fpn"]
+            t_fpn = teacher(t_images)["backbone_fpn"]
+            s_fpn = student(s_images)["backbone_fpn"]
+        t_fpn = match_student_grid(t_fpn, s_fpn)
         total, per_level = distillation_loss(s_fpn, t_fpn, weights)
         losses = {"loss": total.item()} | {f"loss_l{i}": x.item() for i, x in enumerate(per_level)}
         for key, value in losses.items():
@@ -110,8 +131,9 @@ def build_loaders(cfg: DictConfig, start_step: int) -> tuple[Iterator, DataLoade
         val_paths = rng.sample(val_paths, cfg.data.max_val_images)
 
     common = {"batch_size": cfg.batch_size, "num_workers": cfg.data.num_workers, "pin_memory": True}
-    train_set = FrameDataset(train_paths, cfg.data.image_size, augment=cfg.data.augment)
-    val_set = FrameDataset(val_paths, cfg.data.image_size)
+    extra = cfg.get("student_image_size")  # reduced-resolution student (mobile model)
+    train_set = FrameDataset(train_paths, cfg.data.image_size, cfg.data.augment, extra)
+    val_set = FrameDataset(val_paths, cfg.data.image_size, extra_size=extra)
     # Seed depends on the start step: a resumed run gets a new, but reproducible, data order.
     generator = torch.Generator().manual_seed(cfg.seed + start_step)
     train = DataLoader(train_set, shuffle=True, drop_last=True, generator=generator, **common)
@@ -163,6 +185,9 @@ def main() -> None:
 
     teacher = build_teacher(cfg)
     student = build_student(cfg.student).cuda()
+    if cfg.get("init_student"):  # fine-tune an already distilled student (e.g. night1)
+        init = torch.load(cfg.init_student, map_location="cpu", weights_only=False)["student"]
+        student.load_state_dict(init, strict=True)
     set_train_mode(student, cfg.freeze_bn)
     optimizer = torch.optim.AdamW(
         student.parameters(), lr=cfg.optim.lr, weight_decay=cfg.optim.weight_decay
@@ -191,7 +216,7 @@ def main() -> None:
     with start_run("distill", run_name=cfg.run_name, cfg=cfg, run_id=run_id) as run:
         t0, images_seen, accum = time.perf_counter(), 0, cfg.grad_accum
         for step in range(start_step, sched.total_steps):
-            micro_batches = [next(train_iter).cuda(non_blocking=True) for _ in range(accum)]
+            micro_batches = [next(train_iter) for _ in range(accum)]  # moved to GPU in train_step
             losses = train_step(teacher, student, micro_batches, optimizer, weights, cfg.grad_clip)
             scheduler.step()
             images_seen += cfg.batch_size * cfg.grad_accum

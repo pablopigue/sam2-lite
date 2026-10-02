@@ -46,3 +46,18 @@ def test_augmented_sample_shape_and_reproducibility(video_dir: Path) -> None:
     again = dataset[0]
     assert first.shape == (3, 1024, 1024) and first.dtype == torch.float32
     assert torch.equal(first, again)  # same seed -> same augmentation
+
+
+def test_extra_size_returns_the_same_frame_at_two_resolutions(video_dir: Path) -> None:
+    """Teacher (1024) and student (smaller) views of the SAME augmented frame."""
+    path = [str(video_dir / "00000.jpg")]
+    plain_big, plain_small = FrameDataset(path, 1024, extra_size=96)[0]
+    torch.testing.assert_close(plain_big, FrameDataset(path, 1024)[0])
+    torch.testing.assert_close(plain_small, FrameDataset(path, 96)[0])
+
+    augmented = FrameDataset(path, 1024, augment=AUGMENT, extra_size=96)
+    torch.manual_seed(0)
+    big, small = augmented[0]
+    torch.manual_seed(0)
+    torch.testing.assert_close(small, FrameDataset(path, 96, augment=AUGMENT)[0])  # same aug
+    assert big.shape == (3, 1024, 1024) and small.shape == (3, 96, 96)
