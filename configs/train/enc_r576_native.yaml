@@ -1,0 +1,50 @@
+# Mobile model, step M2a v2: fine-tune the night1 student encoder at 576×576, distilling the
+# teacher at 576 too (native features: what the frozen SAM 2 modules read at 576). Docs D-033.
+# Same as enc_r576.yaml except: teacher at 576 and no student_image_size (no pooling).
+
+run_name: enc_r576_native
+seed: 0
+device: cuda
+
+data:
+  manifest: data/manifest.csv
+  image_size: 576            # teacher AND student input (native 576 features as targets)
+  num_workers: 4
+  max_train_images: null
+  max_val_images: null
+  augment:
+    crop_scale_min: 0.6
+    hflip_p: 0.5
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.2
+
+init_student: checkpoints/distill/night1/best.pt
+
+teacher:
+  config: configs/sam2.1/sam2.1_hiera_t.yaml
+  checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+student_config: configs/model/student_mnv4.yaml
+
+loss:
+  weights: [1.0, 1.0, 1.0]   # D-018
+
+batch_size: 2
+grad_accum: 4
+grad_clip: 1.0
+freeze_bn: true
+
+optim:
+  lr: 1.0e-4                 # fine-tuning an already distilled student: lower than night1's 3e-4
+  weight_decay: 0.05
+schedule:
+  total_steps: 20000
+  warmup_steps: 500
+  min_lr_ratio: 0.01
+
+log_every: 50
+eval_every: 1000
+checkpoint:
+  dir: checkpoints/distill/${run_name}
+  every: 1000
+  keep_last: 3
