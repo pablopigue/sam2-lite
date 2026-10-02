@@ -1,4 +1,4 @@
-.PHONY: setup checkpoints lint format test eval bench train
+.PHONY: setup checkpoints lint format test eval bench train profile
 
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
@@ -33,3 +33,7 @@ bench:  ## Per-frame latency (encoder + full pipeline, GPU and CPU), logged to M
 
 train:  ## Distillation (resumes automatically from the last checkpoint of the run)
 	uv run python -m sam2lite.train.distill --config $(CONFIG)
+
+profile:  ## Per-component CPU time of a video frame (memory attention, decoder...), logged to MLflow
+	uv run python -m sam2lite.bench.profile_pipeline --config configs/bench/latency.yaml \
+		model.name=$(MODEL) $(if $(CKPT),model.ckpt=$(CKPT))
