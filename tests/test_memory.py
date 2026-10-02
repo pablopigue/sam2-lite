@@ -83,3 +83,26 @@ def test_load_memory_attention_checks_memory_frames(tmp_path) -> None:
     load_memory_attention(predictor, str(path), memory_frames=3)
     for name, tensor in predictor.memory_attention.state_dict().items():
         assert torch.equal(tensor, weights[name]), name
+
+
+def test_memory_stride_reaches_further_back() -> None:
+    """With 3 memory frames, stride 4 replaces frame t-2 by an older one (SAM 2's own rule)."""
+    from omegaconf import OmegaConf
+
+    from sam2lite.eval.run_vos import build_predictor
+
+    cfg = OmegaConf.create(
+        {
+            "model": {
+                "name": "teacher",
+                "config": "configs/sam2.1/sam2.1_hiera_t.yaml",
+                "checkpoint": None,
+            },
+            "apply_postprocessing": False,
+            "non_overlap_masks": True,
+            "memory_frames": 3,
+            "memory_stride": 4,
+        }
+    )
+    predictor = build_predictor(cfg, "cpu")
+    assert predictor.num_maskmem == 3 and predictor.memory_temporal_stride_for_eval == 4

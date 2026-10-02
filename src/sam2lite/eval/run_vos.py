@@ -52,6 +52,8 @@ def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
         use_student_encoder(predictor, OmegaConf.load(cfg.student_config), cfg.model.ckpt, device)
     if cfg.get("memory_frames"):  # Plan C1: fewer memory frames, no training
         limit_memory_frames(predictor, cfg.memory_frames)
+    if cfg.get("memory_stride"):  # memory frames every r-th frame (SAM 2's own eval option)
+        predictor.memory_temporal_stride_for_eval = cfg.memory_stride
     if cfg.get("memory_ckpt"):  # Plan C2: memory attention fine-tuned for those memory frames
         load_memory_attention(predictor, cfg.memory_ckpt, cfg.get("memory_frames"))
     return predictor
@@ -170,6 +172,7 @@ def main() -> None:
     videos = list(cfg.videos) if cfg.videos else list_videos(davis_root, cfg.split)
 
     suffix = f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
+    suffix += f"_s{cfg.memory_stride}" if cfg.get("memory_stride") else ""
     suffix += "_ft" if cfg.get("memory_ckpt") else ""
     with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}{suffix}", cfg=cfg):
         mlflow.set_tags({"device": device, "n_videos": str(len(videos))})
