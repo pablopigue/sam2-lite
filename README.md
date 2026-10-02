@@ -92,10 +92,10 @@ uv run python scripts/build_manifest.py                    # train/val split by 
 make train CONFIG=configs/train/night1.yaml                # encoder distillation, ~7 h on an RTX 4060 Laptop
 make train-memory CONFIG=configs/train/memory_k3.yaml      # memory attention distillation, ~3.5 h
 
-FINAL="model.name=student model.ckpt=checkpoints/distill/night1/best.pt memory_frames=3 memory_stride=4 memory_ckpt=checkpoints/memory/memory_k3/best.pt"
-uv run python -m sam2lite.eval.run_vos $FINAL out_dir=outputs/vos/final   # J&F
-uv run python -m sam2lite.bench.latency $FINAL                             # latency
-uv run python -m sam2lite.bench.profile_pipeline $FINAL                    # per-component time
+FINAL=(model.name=student model.ckpt=checkpoints/distill/night1/best.pt memory_frames=3 memory_stride=4 memory_ckpt=checkpoints/memory/memory_k3/best.pt)
+uv run python -m sam2lite.eval.run_vos "${FINAL[@]}" out_dir=outputs/vos/final   # J&F
+uv run python -m sam2lite.bench.latency "${FINAL[@]}"                             # latency
+uv run python -m sam2lite.bench.profile_pipeline "${FINAL[@]}"                    # per-component time
 make eval MODEL=teacher && make bench MODEL=teacher
 make test
 ```

@@ -166,6 +166,9 @@ def run_inference(cfg: DictConfig, videos: list[str], device: str) -> dict[str, 
 
 def main() -> None:
     cfg = load_config()
+    if cfg.model.name not in ("teacher", "student"):
+        # e.g. a shell variable passed as ONE argument: never fall back to the teacher silently
+        raise ValueError(f"model.name must be 'teacher' or 'student', got {cfg.model.name!r}")
     if cfg.model.name == "student" and not cfg.model.ckpt:
         raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
     print(OmegaConf.to_yaml(cfg))
