@@ -21,8 +21,7 @@ from sam2.modeling.position_encoding import PositionEmbeddingSine
 from sam2lite.eval.run_vos import build_predictor
 from sam2lite.tracking import DEFAULT_TRACKING_URI
 
-MODEL_NAME = "sam2-lite"
-DEPLOY_KEYS = ("memory_frames", "memory_stride", "memory_ckpt")
+DEPLOY_KEYS = ("memory_frames", "memory_stride", "memory_ckpt", "image_size")
 
 
 def get_run(client: mlflow.MlflowClient, prefix: str) -> mlflow.entities.Run:
@@ -39,6 +38,7 @@ def main() -> None:
     parser.add_argument("--train-run", required=True, help="run that trained the last component")
     parser.add_argument("--eval-run", required=True)
     parser.add_argument("--latency-run", required=True)
+    parser.add_argument("--name", default="sam2-lite", help="registered model name")
     parser.add_argument("--alias", default="champion")
     args, overrides = parser.parse_known_args()
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI))
@@ -72,7 +72,7 @@ def main() -> None:
         info = mlflow.pytorch.log_model(
             predictor,
             name="sam2_lite_tracker",
-            registered_model_name=MODEL_NAME,
+            registered_model_name=args.name,
             serialization_format="pickle",  # see scripts/register_model.py
         )
     version = info.registered_model_version
@@ -83,14 +83,17 @@ def main() -> None:
         "jf_davis_val": f"{m_eval['JF']:.2f}",
         "j": f"{m_eval['J']:.2f}",
         "f": f"{m_eval['F']:.2f}",
-        "cpu6t_pipeline_ms": f"{m_lat['cpu6t_pipeline_median_ms']:.0f}",
         "eval_run": eval_run.info.run_id,
         "latency_run": latency_run.info.run_id,
     }
+    for threads in (6, 2):  # whatever the latency run measured
+        key = f"cpu{threads}t_pipeline_median_ms"
+        if key in m_lat:
+            tags[f"cpu{threads}t_pipeline_ms"] = f"{m_lat[key]:.0f}"
     for key, value in tags.items():
-        client.set_model_version_tag(MODEL_NAME, version, key, value)
-    client.set_registered_model_alias(MODEL_NAME, args.alias, version)
-    print(f"Registered {MODEL_NAME} v{version} (alias '{args.alias}')")
+        client.set_model_version_tag(args.name, version, key, value)
+    client.set_registered_model_alias(args.name, args.alias, version)
+    print(f"Registered {args.name} v{version} (alias '{args.alias}')")
     print(tags)
 
 

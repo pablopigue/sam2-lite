@@ -1,0 +1,47 @@
+# Night MNv4-L: night1 recipe with a larger student (MobileNetV4-Conv-Large).
+# Sized from smoke test: ~14.1 img/s with micro-batch 2 (4 gave no speed-up).
+
+run_name: night_mnv4l
+seed: 0
+device: cuda
+
+data:
+  manifest: data/manifest.csv
+  image_size: 1024
+  num_workers: 4
+  max_train_images: null     # all 3,783 train frames (54 videos)
+  max_val_images: null       # all 426 frames of the 6 held-out train videos
+  augment:
+    crop_scale_min: 0.6
+    hflip_p: 0.5
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.2
+
+teacher:
+  config: configs/sam2.1/sam2.1_hiera_t.yaml
+  checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+student_config: configs/model/student_mnv4l.yaml
+
+loss:
+  weights: [1.0, 1.0, 1.0]   # D-018
+
+batch_size: 2
+grad_accum: 4                # effective batch 8
+grad_clip: 1.0
+freeze_bn: true              # D-019
+
+optim:
+  lr: 3.0e-4                 # lower than the smoke test (5e-4 gave a loss spike at peak lr)
+  weight_decay: 0.05
+schedule:
+  total_steps: 35000
+  warmup_steps: 1000         # slower warm-up than the smoke test (10 steps)
+  min_lr_ratio: 0.01
+
+log_every: 50
+eval_every: 1000             # val loss on the held-out videos; best.pt keeps the best one
+checkpoint:
+  dir: checkpoints/distill/${run_name}
+  every: 1000
+  keep_last: 3

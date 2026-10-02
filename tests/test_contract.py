@@ -16,7 +16,7 @@ from sam2.modeling.backbones.image_encoder import ImageEncoder
 from sam2lite.models.student import build_student, scale_neck_init, set_train_mode
 
 IMAGE_SIZE = 1024
-STUDENT_CONFIG = "configs/model/student_mnv4.yaml"
+STUDENT_CONFIGS = ["configs/model/student_mnv4.yaml", "configs/model/student_mnv4l.yaml"]
 TEACHER_CONFIG = "configs/sam2.1/sam2.1_hiera_t.yaml"
 
 
@@ -25,9 +25,10 @@ def teacher() -> ImageEncoder:
     return build_sam2(TEACHER_CONFIG, ckpt_path=None, device="cpu").image_encoder.eval()
 
 
-@pytest.fixture(scope="module")
-def student() -> ImageEncoder:
-    cfg = OmegaConf.merge(OmegaConf.load(STUDENT_CONFIG), {"pretrained": False})
+@pytest.fixture(scope="module", params=STUDENT_CONFIGS)
+def student(request) -> ImageEncoder:
+    """Every student encoder config must honour the contract."""
+    cfg = OmegaConf.merge(OmegaConf.load(request.param), {"pretrained": False})
     return build_student(cfg).eval()
 
 
