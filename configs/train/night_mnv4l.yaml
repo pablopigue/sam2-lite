@@ -35,7 +35,7 @@ optim:
   lr: 3.0e-4                 # lower than the smoke test (5e-4 gave a loss spike at peak lr)
   weight_decay: 0.05
 schedule:
-  total_steps: 35000
+  total_steps: 42000
   warmup_steps: 1000         # slower warm-up than the smoke test (10 steps)
   min_lr_ratio: 0.01
 
