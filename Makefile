@@ -1,4 +1,4 @@
-.PHONY: setup checkpoints lint format test eval bench train profile
+.PHONY: setup checkpoints lint format test eval bench train profile train-memory
 
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
@@ -37,3 +37,6 @@ train:  ## Distillation (resumes automatically from the last checkpoint of the r
 profile:  ## Per-component CPU time of a video frame (memory attention, decoder...), logged to MLflow
 	uv run python -m sam2lite.bench.profile_pipeline --config configs/bench/latency.yaml \
 		model.name=$(MODEL) $(if $(CKPT),model.ckpt=$(CKPT))
+
+train-memory:  ## Plan C2: distil the memory attention to K memory frames (resumes automatically)
+	uv run python -m sam2lite.train.distill_memory --config $(CONFIG)

@@ -48,3 +48,20 @@ def test_rejects_invalid_number_of_frames() -> None:
     for bad in (1, 8):
         with pytest.raises(ValueError):
             limit_memory_frames(predictor, bad)
+
+
+def test_memory_variant_restores_the_teacher() -> None:
+    """Inside: student attention + K frames. Outside: the original teacher, untouched."""
+    import copy
+
+    from sam2lite.train.distill_memory import memory_variant
+
+    predictor = build_sam2_video_predictor(
+        "configs/sam2.1/sam2.1_hiera_t.yaml", ckpt_path=None, device="cpu"
+    )
+    teacher, tpos = predictor.memory_attention, predictor.maskmem_tpos_enc
+    student = copy.deepcopy(teacher)
+    with memory_variant(predictor, student, 3):
+        assert predictor.memory_attention is student and predictor.num_maskmem == 3
+    assert predictor.memory_attention is teacher
+    assert predictor.num_maskmem == 7 and predictor.maskmem_tpos_enc is tpos

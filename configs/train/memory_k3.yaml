@@ -1,0 +1,45 @@
+# Plan C2: fine-tune SAM 2.1's memory attention to work with K memory frames, by distilling the
+# original memory attention with 7 frames (teacher) on DAVIS train clips.
+
+run_name: memory_k3
+seed: 0
+memory_frames: 3              # K used by the student memory attention (conditioning + K-1 recent)
+clip_len: 12
+
+data:
+  manifest: data/manifest.csv
+  davis_root: data/raw/DAVIS
+  stride: 4                   # a train clip starts every `stride` frames
+  hflip_p: 0.5
+  num_workers: 4
+  max_train_clips: null       # null = all (819); small number for smoke tests
+  max_val_clips: null         # null = all (11)
+
+# SAM 2.1 video predictor used for tracking: night1 student encoder + the original memory and
+# decoder. Its memory attention (7 frames) is the teacher.
+predictor:
+  model:
+    name: student
+    config: configs/sam2.1/sam2.1_hiera_t.yaml
+    checkpoint: checkpoints/sam2.1_hiera_tiny.pt
+    ckpt: checkpoints/distill/night1/best.pt
+  student_config: configs/model/student_mnv4.yaml
+  apply_postprocessing: false
+  non_overlap_masks: true
+
+grad_accum: 4                 # clips per optimizer step
+grad_clip: 1.0
+optim:
+  lr: 2.0e-5                  # small: the student starts from the original (working) weights
+  weight_decay: 0.01
+schedule:
+  total_steps: 2000           # optimizer steps (~10 epochs of 819 clips)
+  warmup_steps: 100
+  min_lr_ratio: 0.01
+
+log_every: 20
+eval_every: 200
+checkpoint:
+  dir: checkpoints/memory/${run_name}
+  every: 200
+  keep_last: 3
