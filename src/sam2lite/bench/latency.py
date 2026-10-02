@@ -102,7 +102,8 @@ def main() -> None:
         if not cfg.model.ckpt:
             raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
         cfg.student = OmegaConf.load(cfg.student_config)  # logged with the run's params
-    suffix = f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
+    suffix = f"_r{cfg.image_size}" if cfg.get("image_size") not in (None, 1024) else ""
+    suffix += f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
     suffix += f"_s{cfg.memory_stride}" if cfg.get("memory_stride") else ""
     suffix += "_ft" if cfg.get("memory_ckpt") else ""
     with start_run("latency", run_name=f"{cfg.model.name}{suffix}", cfg=cfg):
@@ -167,7 +168,7 @@ def build_workloads(cfg: DictConfig, device: str) -> dict[str, Callable[[], obje
     predictor = build_predictor(cfg, device)
     print(f"Image encoder: {type(predictor.image_encoder.trunk).__name__}")
     return {
-        "encoder": encoder_workload(predictor.image_encoder, device, cfg.image_size),
+        "encoder": encoder_workload(predictor.image_encoder, device, predictor.image_size),
         "pipeline": pipeline_workload(predictor, Path(cfg.davis_root), cfg.pipeline_video),
     }
 

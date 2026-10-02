@@ -41,6 +41,8 @@ def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
     student; memory attention, memory encoder and mask decoder stay SAM 2.1-tiny's.
     """
     overrides = [f"++model.non_overlap_masks={str(cfg.non_overlap_masks).lower()}"]
+    if cfg.get("image_size"):  # mobile model: SAM 2 derives the token grid etc. from image_size
+        overrides.append(f"++model.image_size={cfg.image_size}")
     predictor = build_sam2_video_predictor(
         config_file=cfg.model.config,
         ckpt_path=cfg.model.checkpoint,
@@ -171,7 +173,8 @@ def main() -> None:
     davis_root, out_dir = Path(cfg.davis_root), Path(cfg.out_dir)
     videos = list(cfg.videos) if cfg.videos else list_videos(davis_root, cfg.split)
 
-    suffix = f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
+    suffix = f"_r{cfg.image_size}" if cfg.get("image_size") not in (None, 1024) else ""
+    suffix += f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
     suffix += f"_s{cfg.memory_stride}" if cfg.get("memory_stride") else ""
     suffix += "_ft" if cfg.get("memory_ckpt") else ""
     with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}{suffix}", cfg=cfg):

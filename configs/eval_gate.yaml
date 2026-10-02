@@ -12,3 +12,9 @@ speed:                         # measured locally with configs/bench/latency.yam
 
 # The CI eval gate (Day 10) runs a mini-evaluation on 2-3 short DAVIS val videos; its threshold
 # will be derived from the teacher's score on those same videos with the same max_jf_drop.
+
+# Mobile / low-resource model (sam2-lite-mobile), fixed BEFORE any result at reduced resolution
+# (02/10/2026, docs D-031). Measured on the laptop CPU with 2 threads = the free HF Space (2 vCPU).
+mobile:
+  min_jf: 80.0                       # DAVIS 2017 val (full)
+  max_pipeline_ms_cpu2t: 600.0       # median ms per frame, full pipeline, configs/bench/latency.yaml

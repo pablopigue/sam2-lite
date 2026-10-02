@@ -20,7 +20,7 @@ devices: [cuda, cpu]
 # the P-cores; 2 threads approximates a free Hugging Face CPU Space (2 vCPU).
 cpu_threads: [6, 2]
 
-image_size: 1024
+image_size: 1024              # model input resolution (mobile model: 512)
 # The pipeline is timed frame by frame on a real video. The first frames are warmup: besides the
 # usual one-off costs, the memory bank fills up during the first num_maskmem (= 7) frames.
 davis_root: data/raw/DAVIS
