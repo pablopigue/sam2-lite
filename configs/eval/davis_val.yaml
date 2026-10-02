@@ -11,6 +11,7 @@ model:
   checkpoint: checkpoints/sam2.1_hiera_tiny.pt # memory + decoder (and teacher encoder) weights
   ckpt: null                                   # student only: distillation checkpoint (best.pt)
 student_config: configs/model/student_mnv4.yaml
+memory_frames: null          # Plan C1: number of memory frames (null = SAM 2.1's 7)
 
 # Same settings as the official SAM 2 evaluation (no hole filling, one PNG per frame).
 apply_postprocessing: false

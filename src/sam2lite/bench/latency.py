@@ -102,7 +102,8 @@ def main() -> None:
         if not cfg.model.ckpt:
             raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
         cfg.student = OmegaConf.load(cfg.student_config)  # logged with the run's params
-    with start_run("latency", run_name=cfg.model.name, cfg=cfg):
+    suffix = f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
+    with start_run("latency", run_name=f"{cfg.model.name}{suffix}", cfg=cfg):
         mlflow.set_tags(hardware_tags())
         mlflow.log_metrics(size_metrics(cfg))
         results = benchmark(cfg)

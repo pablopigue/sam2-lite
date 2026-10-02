@@ -29,6 +29,7 @@ from sam2lite.data.davis import (
     split_objects,
 )
 from sam2lite.eval.jf import evaluate
+from sam2lite.models.memory import limit_memory_frames
 from sam2lite.models.student import build_student
 from sam2lite.tracking import start_run
 
@@ -49,6 +50,8 @@ def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
     )
     if cfg.model.name == "student":
         use_student_encoder(predictor, OmegaConf.load(cfg.student_config), cfg.model.ckpt, device)
+    if cfg.get("memory_frames"):  # Plan C1: fewer memory frames, no training
+        limit_memory_frames(predictor, cfg.memory_frames)
     return predictor
 
 
@@ -146,7 +149,8 @@ def main() -> None:
     davis_root, out_dir = Path(cfg.davis_root), Path(cfg.out_dir)
     videos = list(cfg.videos) if cfg.videos else list_videos(davis_root, cfg.split)
 
-    with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}", cfg=cfg):
+    suffix = f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
+    with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}{suffix}", cfg=cfg):
         mlflow.set_tags({"device": device, "n_videos": str(len(videos))})
         if cfg.skip_inference:  # reuse predictions already in out_dir (no timing metrics)
             print(f"Skipping inference, evaluating existing predictions in {out_dir}")
