@@ -8,6 +8,7 @@ model:
   ckpt: null                # student only: distillation checkpoint (best.pt)
 student_config: configs/model/student_mnv4.yaml
 memory_frames: null          # Plan C1: number of memory frames (null = SAM 2.1's 7)
+memory_ckpt: null            # Plan C2: fine-tuned memory attention (best.pt), needs memory_frames
 
 # Same predictor settings as the evaluation (configs/eval/davis_val.yaml).
 apply_postprocessing: false

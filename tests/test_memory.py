@@ -65,3 +65,21 @@ def test_memory_variant_restores_the_teacher() -> None:
         assert predictor.memory_attention is student and predictor.num_maskmem == 3
     assert predictor.memory_attention is teacher
     assert predictor.num_maskmem == 7 and predictor.maskmem_tpos_enc is tpos
+
+
+def test_load_memory_attention_checks_memory_frames(tmp_path) -> None:
+    """The fine-tuned weights are loaded, and only with the K they were trained for."""
+    from sam2lite.eval.run_vos import load_memory_attention
+
+    predictor = build_sam2_video_predictor(
+        "configs/sam2.1/sam2.1_hiera_t.yaml", ckpt_path=None, device="cpu"
+    )
+    weights = {k: v + 1.0 for k, v in predictor.memory_attention.state_dict().items()}
+    path = tmp_path / "best.pt"
+    torch.save({"memory_frames": 3, "memory_attention": weights}, path)
+
+    with pytest.raises(ValueError):
+        load_memory_attention(predictor, str(path), memory_frames=7)
+    load_memory_attention(predictor, str(path), memory_frames=3)
+    for name, tensor in predictor.memory_attention.state_dict().items():
+        assert torch.equal(tensor, weights[name]), name

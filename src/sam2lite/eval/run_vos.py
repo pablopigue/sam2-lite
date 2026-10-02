@@ -52,7 +52,27 @@ def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
         use_student_encoder(predictor, OmegaConf.load(cfg.student_config), cfg.model.ckpt, device)
     if cfg.get("memory_frames"):  # Plan C1: fewer memory frames, no training
         limit_memory_frames(predictor, cfg.memory_frames)
+    if cfg.get("memory_ckpt"):  # Plan C2: memory attention fine-tuned for those memory frames
+        load_memory_attention(predictor, cfg.memory_ckpt, cfg.get("memory_frames"))
     return predictor
+
+
+def load_memory_attention(
+    predictor: SAM2VideoPredictor, ckpt_path: str, memory_frames: int | None
+) -> None:
+    """Load a memory attention distilled by train/distill_memory.py (best.pt or step_*.pt).
+
+    It was trained for a fixed number of memory frames: evaluating it with another number
+    would be meaningless, so a mismatch is an error.
+    """
+    state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    trained_k = state.get("memory_frames", state.get("config", {}).get("memory_frames"))
+    if trained_k != memory_frames:
+        raise ValueError(
+            f"{ckpt_path} was trained for {trained_k} memory frames, "
+            f"but memory_frames={memory_frames}"
+        )
+    predictor.memory_attention.load_state_dict(state["memory_attention"], strict=True)
 
 
 def use_student_encoder(
@@ -150,6 +170,7 @@ def main() -> None:
     videos = list(cfg.videos) if cfg.videos else list_videos(davis_root, cfg.split)
 
     suffix = f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
+    suffix += "_ft" if cfg.get("memory_ckpt") else ""
     with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}{suffix}", cfg=cfg):
         mlflow.set_tags({"device": device, "n_videos": str(len(videos))})
         if cfg.skip_inference:  # reuse predictions already in out_dir (no timing metrics)
