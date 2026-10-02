@@ -104,6 +104,7 @@ def main() -> None:
         cfg.student = OmegaConf.load(cfg.student_config)  # logged with the run's params
     with start_run("latency", run_name=cfg.model.name, cfg=cfg):
         mlflow.set_tags(hardware_tags())
+        mlflow.log_metrics(size_metrics(cfg))
         results = benchmark(cfg)
         table = format_table(cfg, results)
         print(table)
@@ -112,6 +113,30 @@ def main() -> None:
             key = device if threads is None else f"{device}{threads}t"  # e.g. cpu6t_encoder
             mlflow.log_metric(f"{key}_{name}_median_ms", stats["median_ms"])
             mlflow.log_metric(f"{key}_{name}_p90_ms", stats["p90_ms"])
+
+
+def size_metrics(cfg: DictConfig) -> dict[str, float]:
+    """Parameters and fp32 size of the image encoder and of the whole predictor (MB = 2**20 B)."""
+    predictor = build_predictor(cfg, "cpu")
+
+    def count(module: torch.nn.Module) -> tuple[float, float]:
+        tensors = list(module.parameters()) + list(module.buffers())
+        n_params = sum(p.numel() for p in module.parameters())
+        n_bytes = sum(t.numel() * 4 for t in tensors)  # fp32 = 4 bytes per value
+        return n_params / 1e6, n_bytes / 2**20
+
+    enc_params, enc_mb = count(predictor.image_encoder)
+    all_params, all_mb = count(predictor)
+    print(
+        f"Encoder: {enc_params:.2f} M params, {enc_mb:.1f} MB | "
+        f"whole model: {all_params:.2f} M params, {all_mb:.1f} MB (fp32)"
+    )
+    return {
+        "encoder_params_M": enc_params,
+        "encoder_size_mb": enc_mb,
+        "model_params_M": all_params,
+        "model_size_mb": all_mb,
+    }
 
 
 def benchmark(cfg: DictConfig) -> list[tuple[str, int | None, str, dict[str, float]]]:
