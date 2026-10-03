@@ -29,6 +29,7 @@ from sam2lite.data.davis import (
     split_objects,
 )
 from sam2lite.eval.jf import evaluate
+from sam2lite.export.ort_encoder import load_ort_encoder
 from sam2lite.models.memory import limit_memory_frames
 from sam2lite.models.student import load_student
 from sam2lite.tracking import start_run
@@ -50,7 +51,13 @@ def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
         apply_postprocessing=cfg.apply_postprocessing,
         hydra_overrides_extra=overrides,
     )
-    if cfg.model.name == "student":
+    if cfg.model.get("onnx"):  # Day 8: the student encoder run by ONNX Runtime (CPU only)
+        if cfg.model.name != "student" or device != "cpu":
+            raise ValueError("model.onnx needs model.name=student and the CPU")
+        predictor.image_encoder = load_ort_encoder(
+            OmegaConf.load(cfg.student_config), cfg.model.onnx
+        )
+    elif cfg.model.name == "student":
         use_student_encoder(predictor, OmegaConf.load(cfg.student_config), cfg.model.ckpt, device)
     if cfg.get("memory_frames"):  # Plan C1: fewer memory frames, no training
         limit_memory_frames(predictor, cfg.memory_frames)
@@ -137,12 +144,16 @@ def run_inference(cfg: DictConfig, videos: list[str], device: str) -> dict[str, 
     predictor = build_predictor(cfg, device)
     # Record which encoder actually ran (teacher 27.2 M vs student 7.5 M): guards against
     # evaluating the teacher by mistake under a "student" label.
-    encoder_params = sum(p.numel() for p in predictor.image_encoder.parameters())
-    mlflow.set_tag("encoder_params_M", f"{encoder_params / 1e6:.2f}")
-    print(
-        f"Image encoder: {type(predictor.image_encoder.trunk).__name__}, "
-        f"{encoder_params / 1e6:.2f} M params"
-    )
+    if cfg.model.get("onnx"):  # the weights live in the ONNX session, not in .parameters()
+        mlflow.set_tag("encoder_runtime", "onnxruntime")
+        print(f"Image encoder: ONNX Runtime, {cfg.model.onnx}")
+    else:
+        encoder_params = sum(p.numel() for p in predictor.image_encoder.parameters())
+        mlflow.set_tag("encoder_params_M", f"{encoder_params / 1e6:.2f}")
+        print(
+            f"Image encoder: {type(predictor.image_encoder.trunk).__name__}, "
+            f"{encoder_params / 1e6:.2f} M params"
+        )
     total_frames, start = 0, time.perf_counter()
     # bf16 autocast on GPU, as in the official evaluation; full precision on CPU.
     with torch.autocast(device, dtype=torch.bfloat16, enabled=device == "cuda"):
@@ -159,10 +170,11 @@ def main() -> None:
     if cfg.model.name not in ("teacher", "student"):
         # e.g. a shell variable passed as ONE argument: never fall back to the teacher silently
         raise ValueError(f"model.name must be 'teacher' or 'student', got {cfg.model.name!r}")
-    if cfg.model.name == "student" and not cfg.model.ckpt:
+    if cfg.model.name == "student" and not (cfg.model.ckpt or cfg.model.get("onnx")):
         raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
     print(OmegaConf.to_yaml(cfg))
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # The ONNX encoder runs on CPU (the deployment target), so the whole predictor does too.
+    device = "cuda" if torch.cuda.is_available() and not cfg.model.get("onnx") else "cpu"
     davis_root, out_dir = Path(cfg.davis_root), Path(cfg.out_dir)
     videos = list(cfg.videos) if cfg.videos else list_videos(davis_root, cfg.split)
 
@@ -170,6 +182,7 @@ def main() -> None:
     suffix += f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
     suffix += f"_s{cfg.memory_stride}" if cfg.get("memory_stride") else ""
     suffix += "_ft" if cfg.get("memory_ckpt") else ""
+    suffix += "_onnx" if cfg.model.get("onnx") else ""
     with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}{suffix}", cfg=cfg):
         mlflow.set_tags({"device": device, "n_videos": str(len(videos))})
         if cfg.skip_inference:  # reuse predictions already in out_dir (no timing metrics)
