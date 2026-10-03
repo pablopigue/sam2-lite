@@ -21,6 +21,7 @@ dependencies = [
     "scikit-image>=0.26.0",
     "onnxruntime>=1.30.0",
     "safetensors>=0.8.0",
+    "huggingface-hub>=2.0.0",
 ]
 
 [dependency-groups]

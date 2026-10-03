@@ -1,0 +1,28 @@
+# Hugging Face model repo for sam2-lite: what is uploaded and which MLflow runs fill the card.
+# Every number in the model card comes from these runs (git_dirty=False is enforced).
+
+repo_id: Pablopigue/sam2-lite
+private: true                  # first upload private: review on the Hub, then make it public
+bundle_dir: checkpoints/bundle/sam2-lite
+onnx: [checkpoints/onnx/student_encoder_r1024.onnx, checkpoints/onnx/student_encoder_r576.onnx]
+template: configs/publish/model_card.md
+out_dir: outputs/hf/sam2-lite  # staging folder, reviewed before --push
+github: https://github.com/pablopigue/sam2-lite
+
+runs:
+  eval:                        # J&F on DAVIS 2017 val (30 videos)
+    teacher: b44efdd1
+    sam2_lite: 62e59f5e
+    mobile: ca473c99
+  latency:                     # PyTorch, docs/tabla_resultados.md and D-034
+    teacher: a0b4ebcc
+    sam2_lite: a384f235
+    mobile: b205e7be           # different session from the 1024 runs (~10 % run-to-run)
+  onnx:                        # D-040: same session, PyTorch vs ONNX Runtime
+    torch_1024: af0d9753
+    onnx_1024: 7baca321
+    torch_576: 79a6f48c
+    onnx_576: 005f6d98
+  onnx_quality:                # 5 val videos at 576, PyTorch vs ONNX encoder
+    torch: 7be93e7d
+    onnx: 4e29d891

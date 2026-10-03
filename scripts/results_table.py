@@ -11,19 +11,7 @@ import os
 
 import mlflow
 
-from sam2lite.tracking import DEFAULT_TRACKING_URI
-
-
-def get_run(prefix: str) -> mlflow.entities.Run:
-    """Run whose id starts with `prefix` (8 characters are enough), across all experiments."""
-    runs = mlflow.search_runs(search_all_experiments=True, output_format="list")
-    matches = [r for r in runs if r.info.run_id.startswith(prefix)]
-    if len(matches) != 1:
-        raise ValueError(f"{len(matches)} runs match {prefix!r}")
-    run = matches[0]
-    if run.data.tags.get("git_dirty") != "False":
-        raise ValueError(f"run {prefix} was produced with uncommitted changes: not reportable")
-    return run
+from sam2lite.tracking import DEFAULT_TRACKING_URI, get_run
 
 
 def main() -> None:

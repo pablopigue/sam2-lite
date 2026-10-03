@@ -58,3 +58,18 @@ def start_run(
         mlflow.set_tags(git_state())
         mlflow.log_text(OmegaConf.to_yaml(cfg, resolve=True), "config.yaml")
         yield run
+
+
+def get_run(prefix: str) -> mlflow.entities.Run:
+    """Run whose id starts with `prefix` (8 characters are enough), across all experiments.
+
+    Only runs from committed code (git_dirty=False) can be reported in the README or model card.
+    """
+    runs = mlflow.search_runs(search_all_experiments=True, output_format="list")
+    matches = [r for r in runs if r.info.run_id.startswith(prefix)]
+    if len(matches) != 1:
+        raise ValueError(f"{len(matches)} runs match {prefix!r}")
+    run = matches[0]
+    if run.data.tags.get("git_dirty") != "False":
+        raise ValueError(f"run {prefix} was produced with uncommitted changes: not reportable")
+    return run
