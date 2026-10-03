@@ -47,6 +47,12 @@ def post(client: TestClient, video: Path, **form) -> object:
         return client.post("/track", files={"video": ("in.mp4", f, "video/mp4")}, data=form)
 
 
+def test_index_serves_the_web_page(client: TestClient) -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"] and "/track" in response.text
+
+
 def test_health_lists_the_loaded_models(client: TestClient) -> None:
     assert client.get("/health").json() == {
         "status": "ok",

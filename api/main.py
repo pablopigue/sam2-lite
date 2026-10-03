@@ -4,7 +4,7 @@ Same logic as the Gradio app (sam2lite.demo), for programs instead of people. CP
 the ONNX Runtime encoder, like the measured deployment target.
 
 Run locally:
-    make api                # http://127.0.0.1:8000/docs
+    make api                # page: http://127.0.0.1:8000/  ·  docs: http://127.0.0.1:8000/docs
     curl -F video=@app/examples/swans.mp4 -F x=660 -F y=225 \
         http://127.0.0.1:8000/track -o tracked.mp4
 """
@@ -19,7 +19,7 @@ from typing import Annotated
 
 import cv2
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from omegaconf import OmegaConf
 from sam2.sam2_video_predictor import SAM2VideoPredictor
 
@@ -39,6 +39,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="sam2-lite", version="0.1.0", lifespan=lifespan)
+
+
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    """A minimal web page that calls /track (upload, click, see the result)."""
+    return FileResponse(Path(__file__).with_name("static") / "index.html")
 
 
 @app.get("/health")

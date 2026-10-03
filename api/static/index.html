@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sam2-lite API</title>
+  <style>
+    :root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --accent: #4f46e5; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8; --border: #334155; --accent: #818cf8; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+    h1 { margin: 0 0 4px; font-size: 1.8rem; }
+    .muted { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .stage { position: relative; display: inline-block; max-width: 100%; }
+    video { max-width: 100%; border-radius: 8px; display: block; }
+    #source { cursor: crosshair; }
+    #dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #16a34a;
+           border: 2px solid white; transform: translate(-50%, -50%); display: none; pointer-events: none; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    button { background: var(--accent); color: white; border: 0; border-radius: 8px; padding: 10px 18px;
+             font-size: 1rem; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    select, input[type=file] { color: var(--text); }
+    code { font-size: 0.9em; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>sam2-lite API</h1>
+  <p class="muted">A minimal page that calls <code>POST /track</code>. Choose a short video, click
+  the object in its first frame, and track it. API docs: <a href="/docs">/docs</a>.</p>
+  <div class="grid">
+    <section class="card">
+      <strong>1 · Video and click</strong>
+      <div class="row"><input id="file" type="file" accept="video/*"></div>
+      <div class="row stage">
+        <video id="source" muted playsinline preload="auto"></video><span id="dot"></span>
+      </div>
+      <div class="row">
+        <select id="model"></select>
+        <button id="run" disabled>Track object</button>
+      </div>
+      <p id="status" class="muted">Choose a video.</p>
+    </section>
+    <section class="card">
+      <strong>2 · Result</strong>
+      <div class="row"><video id="result" controls autoplay loop muted playsinline></video></div>
+      <p id="info" class="muted"></p>
+    </section>
+  </div>
+  <p class="muted">Unofficial project, not affiliated with Meta. Non-commercial research use only.</p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let file = null, point = null;
+
+// Models come from the API itself, so the page never lists a model the server did not load.
+fetch("/health").then((r) => r.json()).then(({ models }) => {
+  for (const m of models) $("model").add(new Option(m, m, m === "sam2-lite-mobile", m === "sam2-lite-mobile"));
+});
+
+$("file").addEventListener("change", (e) => {
+  file = e.target.files[0];
+  point = null;
+  $("dot").style.display = "none";
+  $("run").disabled = true;
+  $("source").src = URL.createObjectURL(file);
+  $("source").currentTime = 0;  // show the first frame: the click is on frame 0
+  $("status").textContent = "Click the object to track.";
+});
+
+// The click is converted from displayed pixels to pixels of the original video, which is what
+// the API expects (it rescales again if it downsizes the video).
+$("source").addEventListener("click", (e) => {
+  const v = $("source"), box = v.getBoundingClientRect();
+  if (!v.videoWidth) return;
+  point = {
+    x: Math.round((e.clientX - box.left) * v.videoWidth / box.width),
+    y: Math.round((e.clientY - box.top) * v.videoHeight / box.height),
+  };
+  Object.assign($("dot").style, { left: `${e.clientX - box.left}px`, top: `${e.clientY - box.top}px`, display: "block" });
+  $("run").disabled = false;
+  $("status").textContent = `Click at (${point.x}, ${point.y}) of a ${v.videoWidth}×${v.videoHeight} video.`;
+});
+
+$("run").addEventListener("click", async () => {
+  const form = new FormData();
+  form.append("video", file);
+  form.append("x", point.x);
+  form.append("y", point.y);
+  form.append("model", $("model").value);
+  $("run").disabled = true;
+  $("status").textContent = "Tracking… (a few seconds per second of video on CPU)";
+  const response = await fetch("/track", { method: "POST", body: form });
+  $("run").disabled = false;
+  if (!response.ok) {
+    const { detail } = await response.json();
+    $("status").textContent = `Error ${response.status}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`;
+    return;
+  }
+  $("result").src = URL.createObjectURL(await response.blob());
+  const h = (k) => response.headers.get(k);
+  $("info").textContent = `${h("x-model")}: ${h("x-frames")} frames · ${h("x-seconds-per-frame")} s per frame.`;
+  $("status").textContent = "Done.";
+});
+</script>
+</body>
+</html>
