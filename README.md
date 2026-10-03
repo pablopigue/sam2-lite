@@ -164,6 +164,8 @@ MobileSAM, EdgeSAM, EfficientTAM and EdgeTAM also make SAM / SAM 2 lighter. Edge
 
 ## Licenses and citations
 
+sam2-lite is an independent project; it is not affiliated with, endorsed by or sponsored by Meta. "SAM 2" refers to the original model by Meta FAIR, on which this work is based.
+
 - **Code:** Apache License 2.0 (`LICENSE`); third-party credits in `NOTICE`. SAM 2 / SAM 2.1 code and weights: Apache 2.0.
 - **Models:** contain SAM 2.1 weights (Apache 2.0), start from a timm MobileNetV4 backbone pretrained on ImageNet-1k (non-commercial research and educational use only) and were distilled on DAVIS 2017 frames (CC BY-NC 4.0), so they are released for **non-commercial research use only**.
 - `src/sam2lite/eval/third_party/sav_benchmark.py` is SAM 2's J&F evaluator, vendored unmodified with its licenses (BSD, SAM 2 Eval software; BSD 3-Clause, DAVIS; MIT, vos-benchmark).

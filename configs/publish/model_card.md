@@ -79,6 +79,8 @@ mobile = load_bundle(
 
 ## License
 
+sam2-lite is an independent project; it is not affiliated with, endorsed by or sponsored by Meta. "SAM 2" refers to the original model by Meta FAIR, on which this work is based.
+
 Released for **non-commercial research use only** (CC BY-NC 4.0):
 
 - It contains SAM 2.1 weights (memory encoder and mask decoder, plus a **modified**, fine-tuned memory attention) by Meta Platforms, Inc., licensed under the Apache License 2.0 (see `LICENSE` and `NOTICE`).
