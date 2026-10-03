@@ -1,10 +1,10 @@
 """Click-to-track logic shared by the Gradio app and the API (no UI code here).
 
-read_video -> load_tracker -> preview / track (clicks on the first frame) -> overlay_masks
--> write_mp4.
+read_video -> load_tracker -> track (clicks on the first frame) -> overlay_masks -> write_mp4.
 
 A click is (obj_id, x, y, label): label 1 = "part of this object", 0 = "not part of it". Several
-clicks with the same obj_id refine one object; different obj_ids are different objects.
+clicks with the same obj_id refine one object; different obj_ids are different objects. The app
+uses one positive click (simplest and fastest, D-045); the API keeps the general form.
 """
 
 import os
@@ -79,18 +79,6 @@ def load_tracker(cfg: DictConfig, model: str) -> SAM2VideoPredictor:
     return load_bundle(bundle_dir, image_size=spec.image_size, onnx=str(onnx_dir / spec.onnx))
 
 
-def validate_clicks(clicks: list[Click], max_objects: int) -> None:
-    """Every object needs a positive click (negatives alone select nothing); at most N objects."""
-    objects = {obj_id for obj_id, *_ in clicks}
-    if not objects:
-        raise ValueError("click the object to track first")
-    if len(objects) > max_objects:
-        raise ValueError(f"at most {max_objects} objects")
-    without_positive = objects - {obj_id for obj_id, _, _, label in clicks if label == 1}
-    if without_positive:
-        raise ValueError(f"object(s) {sorted(without_positive)} need at least one positive click")
-
-
 def _init_state(predictor: SAM2VideoPredictor, frames: list[np.ndarray]) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         # SAM 2 reads an .mp4 only through decord (not installed) or a folder of JPEGs.
@@ -111,15 +99,6 @@ def _add_clicks(predictor: SAM2VideoPredictor, state: dict, clicks: list[Click])
         # Each call returns frame 0's masks for all objects added so far.
         out = {o: (mask_logits[i, 0] > 0).cpu().numpy() for i, o in enumerate(obj_ids)}
     return out
-
-
-@torch.inference_mode()
-def preview(
-    predictor: SAM2VideoPredictor, first_frame: np.ndarray, clicks: list[Click]
-) -> dict[int, np.ndarray]:
-    """Masks on the first frame only: a 1-frame state is cheap (one encoder call) and not kept,
-    unlike a whole video's state (all frames resized, ~1 GB for 80 frames at 1024)."""
-    return _add_clicks(predictor, _init_state(predictor, [first_frame]), clicks)
 
 
 @torch.inference_mode()

@@ -1,6 +1,6 @@
 # Click-to-track demo (app/app.py, src/sam2lite/demo.py).
-# The limits keep a free CPU Space (2 vCPU) responsive: ~0.4 s/frame for sam2-lite-mobile and
-# ~2.1 s/frame for sam2-lite with 2 threads (D-040).
+# The limits keep a free CPU Space (2 vCPU) responsive: ~36 frames at ~0.35 s/frame (mobile) or
+# ~1.9 s/frame (sam2-lite) with 2 threads (D-043, D-045).
 
 repo_id: Pablopigue/sam2-lite   # private for now: needs HF_TOKEN (Space secret or .env)
 local_bundle: checkpoints/bundle/sam2-lite   # used instead of the Hub if it exists (local dev)
@@ -11,11 +11,10 @@ models:                          # same weights, two input resolutions (D-034, D
   sam2-lite: {image_size: 1024, onnx: student_encoder_r1024.onnx}
 default_model: sam2-lite-mobile
 
-max_seconds: 10                  # longer uploads are cut
-target_fps: 8                    # frames are subsampled to about this rate before tracking
+max_seconds: 6                   # longer uploads are cut
+target_fps: 6                    # frames are subsampled to about this rate before tracking
 max_side: 854                    # longer side of the frames (480p width); bigger uploads are downscaled
 threads: 2                       # torch + ONNX Runtime threads (= free Space vCPUs)
-max_objects: 3                   # each extra object adds a memory attention + decoder pass per frame
 
 # Headline numbers shown in the app header, copied from MLflow (run ids next to each value,
 # all git_dirty=False; same values as the model card).
@@ -32,11 +31,12 @@ links:
 
 # Example videos (scripts/fetch_examples.py): explicit CC0 / CC BY licence on Wikimedia Commons,
 # cut and re-encoded small enough for git (< 1 MB); attribution in app/examples/ATTRIBUTION.md.
+# clicks: [obj_id, x, y, label] on the first frame. hard: the honest failure case, shown with a
+# precomputed teacher-vs-student comparison (scripts/precompute_comparison.py).
 examples:
   dir: app/examples
-  seconds: 8
+  seconds: 5
   height: 480
   videos:
-    - {name: train-river, title: "T3 Train Crossing Cooks River.webm", start: 3.5, point: [330, 240]}
-    - {name: train-viaduct, title: "Train passes over Kilnap Viaduct, Cork City, Ireland.webm", start: 1.5, seconds: 6.3, point: [350, 205]}  # scene cut at 7.96 s
-    - {name: swans, title: "Trumpeter swan family.webm", start: 4, point: [660, 230]}
+    - {name: train-viaduct, title: "Train passes over Kilnap Viaduct, Cork City, Ireland.webm", start: 1.5, clicks: [[1, 350, 205, 1]], hard: true}  # cut at 7.96 s
+    - {name: swans, title: "Trumpeter swan family.webm", start: 4, clicks: [[1, 660, 225, 1]]}

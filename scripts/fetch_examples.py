@@ -112,6 +112,11 @@ def main() -> None:
             f'- `{out.name}`: "{item.title}" by {info["author"]}, {license_text}, '
             f"from {info['page']} (seconds {item.start}-{item.start + seconds:g})."
         )
+        if item.get("hard"):  # derivative made by scripts/precompute_comparison.py
+            lines.append(
+                f"- `{item.name}_teacher_vs_student.mp4`: derived from `{out.name}` (same author "
+                "and licence): two copies side by side with the masks of SAM 2.1 and sam2-lite."
+            )
     (out_dir / "ATTRIBUTION.md").write_text("\n".join(lines) + "\n")
 
 
