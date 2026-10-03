@@ -1,0 +1,16 @@
+# Click-to-track demo (app/app.py, src/sam2lite/demo.py).
+# The limits keep a free CPU Space (2 vCPU) responsive: ~0.4 s/frame for sam2-lite-mobile and
+# ~2.1 s/frame for sam2-lite with 2 threads (D-040).
+
+repo_id: Pablopigue/sam2-lite   # private for now: needs HF_TOKEN (Space secret or .env)
+local_bundle: checkpoints/bundle/sam2-lite   # used instead of the Hub if it exists (local dev)
+local_onnx_dir: checkpoints/onnx
+
+models:                          # same weights, two input resolutions (D-034, D-041)
+  sam2-lite-mobile: {image_size: 576, onnx: student_encoder_r576.onnx}
+  sam2-lite: {image_size: 1024, onnx: student_encoder_r1024.onnx}
+default_model: sam2-lite-mobile
+
+max_seconds: 10                  # longer uploads are cut
+target_fps: 8                    # frames are subsampled to about this rate before tracking
+threads: 2                       # torch + ONNX Runtime threads (= free Space vCPUs)
