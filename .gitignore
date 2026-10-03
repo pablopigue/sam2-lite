@@ -1,8 +1,9 @@
-# Datos, pesos y resultados (nunca a git)
-data/
-checkpoints/
-outputs/
-mlruns/
+# Datos, pesos y resultados (nunca a git). La "/" inicial ancla la regla a la raíz del repo:
+# sin ella, "data/" también ignoraba src/sam2lite/data/ (el código) y configs/data/.
+/data/
+/checkpoints/
+/outputs/
+/mlruns/
 mlflow.db
 *.onnx
 *.pt

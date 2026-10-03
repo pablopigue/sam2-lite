@@ -1,0 +1,8 @@
+# Frames used to distil the encoder: DAVIS 2017 *train* only (labels are not needed).
+# DAVIS 2017 val is never used here: it is reserved for the final J&F evaluation.
+
+davis_root: data/raw/DAVIS
+source_split: train
+val_videos: 6        # held out BY VIDEO to monitor the distillation loss (no frame leakage)
+seed: 0
+manifest: data/manifest.csv
