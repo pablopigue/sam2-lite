@@ -85,8 +85,15 @@ def read_token() -> str:
 def push(cfg: DictConfig, out: Path) -> None:
     token = read_token()
     api = HfApi(token=token)
+    # The hardware must be chosen at creation: the default (cpu-basic) needs PRO for Gradio
+    # Spaces and the request fails with 402 before any ZeroGPU setting could apply.
     api.create_repo(
-        cfg.repo_id, repo_type="space", space_sdk="gradio", private=cfg.private, exist_ok=True
+        cfg.repo_id,
+        repo_type="space",
+        space_sdk="gradio",
+        space_hardware=cfg.hardware,
+        private=cfg.private,
+        exist_ok=True,
     )
     api.add_space_secret(cfg.repo_id, "HF_TOKEN", token)  # lets the Space read the private model
     for key, value in cfg.variables.items():
