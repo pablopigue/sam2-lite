@@ -165,9 +165,9 @@ MobileSAM, EdgeSAM, EfficientTAM and EdgeTAM also make SAM / SAM 2 lighter. Edge
 ## Licenses and citations
 
 - **Code:** Apache License 2.0 (`LICENSE`); third-party credits in `NOTICE`. SAM 2 / SAM 2.1 code and weights: Apache 2.0.
-- **Models:** contain SAM 2.1 weights (Apache 2.0) and were distilled on DAVIS 2017 frames, so they are released for **non-commercial research use**.
+- **Models:** contain SAM 2.1 weights (Apache 2.0), start from a timm MobileNetV4 backbone pretrained on ImageNet-1k (non-commercial research and educational use only) and were distilled on DAVIS 2017 frames (CC BY-NC 4.0), so they are released for **non-commercial research use only**.
 - `src/sam2lite/eval/third_party/sav_benchmark.py` is SAM 2's J&F evaluator, vendored unmodified with its licenses (BSD, SAM 2 Eval software; BSD 3-Clause, DAVIS; MIT, vos-benchmark).
-- DAVIS 2017 does not publish an explicit data license: its videos and frames are **not** redistributed in this repository or in any derived artifact, and this project is non-commercial.
+- **Data:** DAVIS 2017 is licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (README of the official dataset package); some sequences come from third-party sources with their own terms. Its videos, frames and annotations are **not** redistributed in this repository or in any derived artifact, and this project is non-commercial.
 
 ```bibtex
 @article{ravi2024sam2,
@@ -181,6 +181,12 @@ MobileSAM, EdgeSAM, EfficientTAM and EdgeTAM also make SAM / SAM 2 lighter. Edge
   author  = {Pont-Tuset, Jordi and Perazzi, Federico and Caelles, Sergi and Arbel{\'a}ez, Pablo and Sorkine-Hornung, Alexander and Van Gool, Luc},
   journal = {arXiv preprint arXiv:1704.00675},
   year    = {2017}
+}
+@inproceedings{perazzi2016davis,
+  title     = {A Benchmark Dataset and Evaluation Methodology for Video Object Segmentation},
+  author    = {Perazzi, Federico and Pont-Tuset, Jordi and McWilliams, Brian and Van Gool, Luc and Gross, Markus and Sorkine-Hornung, Alexander},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2016}
 }
 @article{qin2024mobilenetv4,
   title   = {MobileNetV4: Universal Models for the Mobile Ecosystem},

@@ -18,8 +18,16 @@ This product builds on and includes third-party work:
 
 - timm (PyTorch Image Models), Apache License 2.0
   https://github.com/huggingface/pytorch-image-models
-  Provides the MobileNetV4 backbone and its ImageNet-pretrained weights.
+  Provides the MobileNetV4 backbone and its pretrained weights. The weights are tagged Apache 2.0
+  but were trained on ImageNet-1k, whose terms of access allow only non-commercial research and
+  educational use (https://image-net.org/download.php).
 
-The models were distilled on frames of the DAVIS 2017 dataset, which does not publish an
-explicit data license. No DAVIS videos or frames are redistributed, and the models are released
-for non-commercial research use.
+- DAVIS 2017 dataset (Pont-Tuset et al., 2017; Perazzi et al., 2016), Creative Commons
+  Attribution-NonCommercial 4.0 (CC BY-NC 4.0), as stated in the README of the official
+  dataset package. https://creativecommons.org/licenses/by-nc/4.0/
+  Some sequences come from third-party online sources with their own terms of use (listed in
+  the package's SOURCES.md). The models were distilled on DAVIS 2017 train frames and evaluated
+  on DAVIS 2017 val. No DAVIS videos, frames or annotations are redistributed.
+
+Because of the ImageNet and DAVIS terms above, the released sam2-lite models are for
+non-commercial research use only.
