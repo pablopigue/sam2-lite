@@ -2,7 +2,12 @@
 
 **SAM 2.1 video object segmentation 2.1× faster on CPU: a distilled mobile image encoder plus a memory attention distilled to attend to fewer frames — measured end to end, with every number traceable to an MLflow run.**
 
-> 🚧 Work in progress. Done: encoder and memory attention distillation, a reduced-resolution mobile variant, evaluation, latency benchmark, profiling, model registry. Next: Hugging Face model + Gradio demo (both models), CI with an evaluation gate.
+[![CI](https://github.com/pablopigue/sam2-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/pablopigue/sam2-lite/actions/workflows/ci.yml)
+
+<p align="center"><img src="assets/demo.gif" width="400" alt="sam2-lite tracking a swan family from one click"></p>
+<p align="center"><sub>sam2-lite tracking a swan family from a single click. Video: "Trumpeter swan family" by Lorie Shaull, <a href="https://creativecommons.org/licenses/by/2.0">CC BY 2.0</a>, cut and with masks drawn.</sub></p>
+
+**Try it locally:** a Gradio app (`make app`), an HTTP API with a minimal web page (`make api`) and a CPU Docker image (`make docker-build && make docker-run`) — see [Deployment](#deployment).
 
 ## The idea
 
@@ -22,7 +27,7 @@ frame ──► [ image encoder ] ──► [ memory attention ] ──► [ mas
 
 ## Results
 
-Teacher: SAM 2.1 Hiera-tiny. Quality on the full **DAVIS 2017 val** set (30 videos, 61 objects, semi-supervised protocol, SAM 2's J&F evaluator). Distillation used DAVIS 2017 *train* only.
+Teacher: SAM 2.1 Hiera-tiny. Quality on the full **DAVIS 2017 val** set (30 videos, 61 objects, semi-supervised protocol, SAM 2's J&F evaluator). Distillation used DAVIS 2017 *train* only. The teacher's J&F is measured here with the same protocol (the SAM 2 paper reports DAVIS 2017 only for the B+ and L models).
 
 | | SAM 2.1 Hiera-T (teacher) | sam2-lite (student) | Change |
 |---|---|---|---|
@@ -105,6 +110,59 @@ Lowering the input to 576×576 divides the tokens per frame by ~3.2, which makes
 
 Per-object analysis (`scripts/compare_vos.py`): the J&F drop is not uniform. A few objects explain most of it — a tiny object (0.1 % of the image) lost after a few frames, and a rider and motorbike merged into one object in a close-up — while most objects lose ~2-3 points. A second encoder run that up-weighted the fine FPN levels improved their feature error but lowered J&F: the coarse level used by the memory matters more for tracking.
 
+### Where the teacher still wins
+
+<p align="center"><img src="assets/hard_case.gif" width="560" alt="Teacher keeps the train, student loses it during a fast zoom-out"></p>
+
+Same clip, same click, both at 1024 px: during a fast camera zoom-out the teacher keeps the train in all 32 frames while sam2-lite loses it in 28 % of them. Large, fast changes of scale are where the smaller encoder falls short. Video: "Train passes over Kilnap Viaduct, Cork City, Ireland" by FILMING CORK, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0), cut and with masks drawn.
+
+## Limitations
+
+- **Accuracy:** −4.7 J&F on DAVIS 2017 val, concentrated in a few small or close-up objects; fast zooms are a visible failure case (above).
+- **sam2-lite-mobile** meets its latency target but not its quality target (77.1 < 80).
+- **Data:** distilled on ~3.8k frames from 54 DAVIS train videos; the experiments point at the data as the current bottleneck.
+- **Latency** was measured on one laptop CPU (i7-13620H); other hardware will differ.
+- **Demo limits:** one object per run from one click; videos are cut to 6 s and processed at ~6 fps on CPU.
+
+## Deployment
+
+The final tracker ships as one **bundle**: `model.safetensors` (the whole predictor's weights; safetensors cannot execute code when loaded, unlike pickle) plus a `config.yaml` to rebuild the architecture, loaded with `strict=True` so no weight can stay silently random. sam2-lite and sam2-lite-mobile share it; only the input size changes. Its J&F matches the evaluated model exactly.
+
+**ONNX Runtime encoder (CPU).** The image encoder is exported to ONNX (one static-shape file per resolution) and checked against PyTorch (max relative error 2.6e-6). Same session, PyTorch → ONNX Runtime:
+
+| | Encoder (ms) | Full pipeline (ms) |
+|---|---|---|
+| 1024, CPU 6 threads | 224 → 142 (1.58×) | 892 → 830 (1.07×) |
+| 1024, CPU 2 threads | 434 → 295 (1.47×) | 2236 → 2075 (1.08×) |
+| 576, CPU 6 threads | 44 → 40 (1.11×) | 159 → 151 (1.06×) |
+| 576, CPU 2 threads | 96 → 75 (1.28×) | 392 → 373 (1.05×) |
+
+The encoder gets faster but the pipeline only gains 5-8 %: the memory attention, still in PyTorch, dominates each frame (Amdahl again). J&F is unchanged (82.35 on 5 val videos with either runtime). MLflow runs: `af0d9753`/`7baca321` (1024), `79a6f48c`/`005f6d98` (576), quality `7be93e7d`/`4e29d891`. (This session measured the PyTorch model at 892 ms, vs 920 ms in the main table: only same-session numbers are compared.)
+
+**Interfaces**, all built on the same `src/sam2lite/demo.py` logic (CPU, ONNX encoder):
+
+- **Gradio app** (`make app`): upload a short video, click the object, pick sam2-lite or sam2-lite-mobile, get an H.264 video; licensed examples and the hard case above.
+- **HTTP API** (`make api`, FastAPI): `POST /track` (video + click) → mp4, `GET /health`, and a minimal web page at `/`.
+- **Docker** (`make docker-build && make docker-run`): CPU-only image of the API; weights are mounted or downloaded, never baked into the image.
+
+## MLOps
+
+```mermaid
+flowchart LR
+  D[DAVIS 2017 train] --> T[Distillation<br/>encoder + memory attention]
+  T --> E[Evaluation<br/>J&F on DAVIS val + CPU latency]
+  T -. params, metrics, git commit .-> M[(MLflow)]
+  E -.-> M
+  M --> R[Model registry<br/>sam2-lite@champion]
+  R --> B[Bundle + ONNX export<br/>verified against PyTorch]
+  B --> A[Gradio app · API · Docker]
+  C[CI on every push<br/>lint · tests · eval gate] --> B
+```
+
+- **Every number is traceable:** each MLflow run stores its full config and git commit; runs from uncommitted code are refused by the scripts that build the tables and the registry.
+- **CI** (GitHub Actions): `ruff` and 66 tests on every push and PR, in a clean machine with the locked environment (`uv sync --locked`). The first CI run found a real bug: a `data/` rule in `.gitignore` had kept the `sam2lite.data` module out of git; it worked locally only because the files were on disk.
+- **Eval gate:** on every push to `main`, the released tracker (bundle + ONNX, CPU) is evaluated on 3 DAVIS val videos and the run fails if J&F drops more than 1.0 point below the champion's score on them (81.8). It is a **regression** gate: on these 3 videos the champion is 8.9 points below the teacher (vs 4.7 on the full set), so the full-val criterion does not transfer to a small subset; the quality criterion stays the full evaluation above. Latency is measured locally, never in CI (shared runners are noisy).
+
 ## Reproduce
 
 Requires Linux, Python 3.11 and [uv](https://docs.astral.sh/uv/). A CUDA GPU is used for training and evaluation.
@@ -126,6 +184,11 @@ uv run python -m sam2lite.bench.latency "${FINAL[@]}"                           
 uv run python -m sam2lite.bench.profile_pipeline "${FINAL[@]}"                    # per-component time
 make eval MODEL=teacher && make bench MODEL=teacher
 make test
+
+make export                    # encoder -> ONNX (1024, 576), checked against PyTorch
+make bundle                    # final tracker -> checkpoints/bundle/sam2-lite
+make gate                      # the CI eval gate, locally
+make app                       # Gradio demo   ·   make api: FastAPI + web page
 ```
 
 Experiments are tracked in a local MLflow database (`uv run mlflow ui --backend-store-uri sqlite:///mlflow.db`); the final tracker is registered as `sam2-lite@champion`.
@@ -140,9 +203,14 @@ src/sam2lite/
   train/            encoder and memory attention distillation loops, losses
   eval/             VOS inference, J&F (vendored SAM 2 evaluator)
   bench/            latency benchmark and per-component profiling
+  export/           ONNX export + ONNX Runtime encoder, safetensors bundle
+  demo.py           video I/O, click-to-track, H.264 output (shared by the app and the API)
   tracking.py       MLflow helpers (config + git commit on every run)
-scripts/            one-off entry points (checkpoints, analysis, result table, model registry)
-tests/              contract, preprocessing, memory, loss, data and tracking tests (no dataset needed)
+app/                Gradio app, licensed example videos and their attribution
+api/                FastAPI service, web page, CPU Dockerfile
+scripts/            entry points (checkpoints, analysis, result table, registry, eval gate, publishing)
+tests/              66 tests: contract, preprocessing, memory, losses, data, ONNX, bundle, demo, API (no dataset needed)
+.github/workflows/  CI: lint, tests, eval gate
 ```
 
 ## Engineering notes
