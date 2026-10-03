@@ -15,3 +15,16 @@ max_seconds: 10                  # longer uploads are cut
 target_fps: 8                    # frames are subsampled to about this rate before tracking
 max_side: 854                    # longer side of the frames (480p width); bigger uploads are downscaled
 threads: 2                       # torch + ONNX Runtime threads (= free Space vCPUs)
+
+# Headline numbers shown in the app header, copied from MLflow (run ids next to each value,
+# all git_dirty=False; same values as the model card).
+stats:
+  speedup_cpu: "2.13×"          # pipeline, CPU 6 threads: a0b4ebcc / a384f235
+  jf_lite: "84.4"               # DAVIS 2017 val J&F: 62e59f5e
+  jf_teacher: "89.1"            # b44efdd1
+  jf_mobile: "77.1"             # ca473c99
+  mobile_ms: "398"              # sam2-lite-mobile, CPU 2 threads: b205e7be
+  encoder_params: "7.5M"        # vs 27.2M for Hiera-T: a384f235 / a0b4ebcc
+links:
+  github: https://github.com/pablopigue/sam2-lite
+  model: https://huggingface.co/Pablopigue/sam2-lite

@@ -8,6 +8,7 @@ Run locally:
 
 import tempfile
 import time
+from pathlib import Path
 
 import gradio as gr
 import numpy as np
@@ -78,30 +79,86 @@ def estimate(video: dict | None, model: str) -> str:
     return f"{model}: about {n * SECONDS_PER_FRAME[model]:.0f} s for {n} frames on 2 CPU threads."
 
 
-with gr.Blocks(title="sam2-lite") as demo:
-    gr.Markdown(
-        "# sam2-lite\n"
-        "SAM 2.1 video object segmentation, faster on CPU: a distilled MobileNetV4 image encoder "
-        "and a memory attention that attends to 3 frames instead of 7. "
-        "Upload a short video, click an object in the first frame and press **Track**. "
-        "Unofficial project, not affiliated with Meta. Non-commercial research use only."
-    )
+S, LINKS = CFG.stats, CFG.links
+HERO = f"""
+<div id="hero">
+  <h1>sam2-lite</h1>
+  <p class="tagline">Click an object in the first frame and SAM 2.1 tracks it through the video,
+  now {S.speedup_cpu} faster on CPU thanks to a distilled mobile encoder and a lighter memory.</p>
+  <div class="stats">
+    <span class="stat"><b>{S.speedup_cpu}</b> faster on CPU</span>
+    <span class="stat">J&amp;F <b>{S.jf_lite}</b> (teacher {S.jf_teacher})</span>
+    <span class="stat"><b>{S.encoder_params}</b>-param encoder</span>
+    <span class="stat">mobile: <b>{S.mobile_ms} ms</b>/frame on 2 CPUs</span>
+  </div>
+  <div class="links"><a href="{LINKS.github}">Code</a>·<a href="{LINKS.model}">Model</a></div>
+</div>
+"""
+HOW_IT_WORKS = f"""
+**Teacher:** SAM 2.1 Hiera-tiny. **Student:** the same tracker with two parts replaced by
+distillation, so the rest of SAM 2.1 is reused unchanged:
+
+1. **Image encoder** → MobileNetV4 + SAM 2's FPN neck ({S.encoder_params} parameters), trained to
+   reproduce the teacher's multi-scale features.
+2. **Memory attention** → attends to 3 past frames instead of 7, fine-tuned to reproduce the
+   original's output.
+
+The encoder runs with ONNX Runtime. Results on DAVIS 2017 val: J&F **{S.jf_lite}** for sam2-lite
+(teacher {S.jf_teacher}) and **{S.jf_mobile}** for sam2-lite-mobile. Details, training and every
+number's MLflow run: see the [model card]({LINKS.model}) and the [code]({LINKS.github}).
+"""
+LIMITS = f"""
+- Only the first **{CFG.max_seconds} s** are used, subsampled to about **{CFG.target_fps} fps**,
+  with the longer side reduced to {CFG.max_side} px: this Space has 2 CPU cores.
+- One object per run, selected with one click on the first frame.
+- Small or thin objects and close-ups of several touching objects are the hardest cases.
+- **License:** non-commercial research use only (CC BY-NC 4.0). Contains SAM 2.1 weights by Meta
+  (Apache 2.0, memory attention modified); encoder pretrained on ImageNet-1k; distilled on
+  DAVIS 2017 (CC BY-NC 4.0).
+"""
+FOOTER = (
+    '<div id="footer">sam2-lite is an independent project; it is not affiliated with, endorsed '
+    "by or sponsored by Meta. “SAM 2” refers to the original model by Meta FAIR.</div>"
+)
+
+
+def step(number: int, title: str) -> None:
+    gr.HTML(f'<div class="step-title"><span class="num">{number}</span>{title}</div>')
+
+
+with gr.Blocks(title="sam2-lite · fast video object tracking") as demo:
+    gr.HTML(HERO)
     video_state, point_state = gr.State(), gr.State()
-    with gr.Row():
-        with gr.Column():
-            video_in = gr.Video(label="Video (first 10 s are used)", sources=["upload"])
-            first_frame = gr.Image(label="First frame: click the object", interactive=False)
-            model = gr.Radio(
-                list(CFG.models),
-                value=CFG.default_model,
-                label="Model",
-                info="sam2-lite-mobile (576 px): ~5x faster. sam2-lite (1024 px): more accurate.",
-            )
-            run = gr.Button("Track", variant="primary")
-            status = gr.Markdown()
-        with gr.Column():
-            video_out = gr.Video(label="Tracked object", autoplay=True)
-            result = gr.Markdown()
+    with gr.Row(equal_height=False):
+        with gr.Column(scale=1):
+            with gr.Group(elem_classes="card"):
+                step(1, "Upload a short video")
+                video_in = gr.Video(show_label=False, sources=["upload"], height=260)
+            with gr.Group(elem_classes="card"):
+                step(2, "Click the object to track")
+                first_frame = gr.Image(show_label=False, interactive=False, height=300)
+            with gr.Group(elem_classes="card"):
+                step(3, "Choose a model and track")
+                model = gr.Radio(
+                    list(CFG.models),
+                    value=CFG.default_model,
+                    show_label=False,
+                    info="mobile (576 px): ~5× faster · sam2-lite (1024 px): more accurate",
+                )
+                run = gr.Button("Track object", variant="primary", elem_id="track-btn")
+                status = gr.Markdown("Upload a video to start.", elem_classes="status")
+        with gr.Column(scale=1):
+            with gr.Group(elem_classes="card"):
+                step(4, "Result")
+                video_out = gr.Video(show_label=False, autoplay=True, height=420)
+                result = gr.Markdown(elem_classes="status")
+            with gr.Group(elem_classes="card"):
+                gr.HTML('<div class="section-title">How it works</div>')
+                gr.Markdown(HOW_IT_WORKS, elem_classes="info")
+            with gr.Group(elem_classes="card"):
+                gr.HTML('<div class="section-title">Limits and license</div>')
+                gr.Markdown(LIMITS, elem_classes="info")
+    gr.HTML(FOOTER)
 
     video_in.change(on_upload, video_in, [first_frame, video_state, point_state, status])
     first_frame.select(on_click, video_state, [first_frame, point_state])
@@ -109,5 +166,13 @@ with gr.Blocks(title="sam2-lite") as demo:
     model.change(estimate, [video_state, model], status)
     run.click(on_track, [video_state, point_state, model], [video_out, result])
 
+THEME = gr.themes.Soft(
+    primary_hue="indigo",
+    secondary_hue="violet",
+    neutral_hue="slate",
+    radius_size="lg",
+    font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+)
+
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme=THEME, css=Path(__file__).with_name("style.css").read_text())
