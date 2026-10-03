@@ -102,13 +102,17 @@ def main() -> None:
         # e.g. a shell variable passed as ONE argument: never fall back to the teacher silently
         raise ValueError(f"model.name must be 'teacher' or 'student', got {cfg.model.name!r}")
     if cfg.model.name == "student":
-        if not cfg.model.ckpt:
+        if not (cfg.model.ckpt or cfg.model.get("onnx")):
             raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
         cfg.student = OmegaConf.load(cfg.student_config)  # logged with the run's params
+    if cfg.model.get("onnx") and "cuda" in cfg.devices:
+        print("model.onnx runs on CPU only: skipping GPU")
+        cfg.devices = [d for d in cfg.devices if d != "cuda"]
     suffix = f"_r{cfg.image_size}" if cfg.get("image_size") not in (None, 1024) else ""
     suffix += f"_mem{cfg.memory_frames}" if cfg.get("memory_frames") else ""
     suffix += f"_s{cfg.memory_stride}" if cfg.get("memory_stride") else ""
     suffix += "_ft" if cfg.get("memory_ckpt") else ""
+    suffix += "_onnx" if cfg.model.get("onnx") else ""
     with start_run("latency", run_name=f"{cfg.model.name}{suffix}", cfg=cfg):
         mlflow.set_tags(hardware_tags())
         mlflow.log_metrics(size_metrics(cfg))
@@ -131,6 +135,14 @@ def size_metrics(cfg: DictConfig) -> dict[str, float]:
         n_params = sum(p.numel() for p in module.parameters())
         n_bytes = sum(t.numel() * 4 for t in tensors)  # fp32 = 4 bytes per value
         return n_params / 1e6, n_bytes / 2**20
+
+    if cfg.model.get("onnx"):
+        # The encoder's weights live in the ONNX file, not in .parameters(): use its size, and
+        # count the rest of the predictor (memory, decoder) as usual.
+        enc_mb = Path(cfg.model.onnx).stat().st_size / 2**20
+        _, rest_mb = count(predictor)
+        print(f"Encoder: ONNX file {enc_mb:.1f} MB | whole model: {rest_mb + enc_mb:.1f} MB")
+        return {"encoder_size_mb": enc_mb, "model_size_mb": rest_mb + enc_mb}
 
     enc_params, enc_mb = count(predictor.image_encoder)
     all_params, all_mb = count(predictor)
@@ -168,8 +180,12 @@ def benchmark(cfg: DictConfig) -> list[tuple[str, int | None, str, dict[str, flo
 def build_workloads(cfg: DictConfig, device: str) -> dict[str, Callable[[], object]]:
     # Same predictor as the evaluation: with model.name=student, the distilled encoder replaces
     # Hiera and memory + decoder stay SAM 2.1-tiny's, so both models run the same workloads.
+    # Built after torch.set_num_threads: an ONNX encoder copies that thread count.
     predictor = build_predictor(cfg, device)
-    print(f"Image encoder: {type(predictor.image_encoder.trunk).__name__}")
+    if cfg.model.get("onnx"):
+        print(f"Image encoder: ONNX Runtime ({cfg.model.onnx})")
+    else:
+        print(f"Image encoder: {type(predictor.image_encoder.trunk).__name__}")
     return {
         "encoder": encoder_workload(predictor.image_encoder, device, predictor.image_size),
         "pipeline": pipeline_workload(predictor, Path(cfg.davis_root), cfg.pipeline_video),
@@ -178,7 +194,8 @@ def build_workloads(cfg: DictConfig, device: str) -> dict[str, Callable[[], obje
 
 def format_table(cfg: DictConfig, results: list) -> str:
     lines = [
-        f"\nModel: {cfg.model.name} | pipeline video: {cfg.pipeline_video}",
+        f"\nModel: {cfg.model.name}{' (ONNX encoder)' if cfg.model.get('onnx') else ''} | "
+        f"pipeline video: {cfg.pipeline_video}",
         f"{'device':<6} {'threads':>7} {'workload':<9} {'median ms':>10} {'p90 ms':>8} {'n':>4}",
     ]
     for device, threads, name, s in results:
