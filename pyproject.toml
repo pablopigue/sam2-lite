@@ -25,6 +25,11 @@ dependencies = [
 ]
 
 [dependency-groups]
+api = [
+    "fastapi>=0.142.2",
+    "python-multipart>=0.0.32",
+    "uvicorn>=0.54.0",
+]
 app = [
     "gradio>=6.29.1",
     "spaces>=0.51.3",
@@ -85,3 +90,4 @@ select = ["E", "F", "I", "UP", "B"]
 # --- Tests ---
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # lets tests import the api/ package from the repo root

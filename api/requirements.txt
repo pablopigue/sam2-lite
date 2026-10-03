@@ -1,0 +1,16 @@
+# Python packages of the API image (api/Dockerfile). Versions match uv.lock; torch comes from the
+# CPU-only index (no NVIDIA libraries). sam-2 is installed afterwards, without build isolation,
+# so it builds against this torch instead of downloading another one just to build.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+torchvision==0.29.1+cpu
+timm==1.0.30
+omegaconf==2.3.1
+huggingface_hub==2.0.0
+safetensors==0.8.0
+onnxruntime==1.30.0
+opencv-python-headless==5.0.0.93
+fastapi==0.142.2
+uvicorn==0.54.0
+python-multipart==0.0.32
+setuptools>=61  # sam-2's build backend (built without isolation)

@@ -1,0 +1,7 @@
+# Allow-list: send only what the API image needs to the Docker daemon (data/, checkpoints/, .venv/
+# and mlruns/ are several GB; the weights are mounted or downloaded at run time instead).
+*
+!api/
+!src/sam2lite/
+!configs/app.yaml
+**/__pycache__

@@ -1,4 +1,4 @@
-.PHONY: setup checkpoints lint format test eval bench train profile train-memory export bundle app
+.PHONY: setup checkpoints lint format test eval bench train profile train-memory export bundle app api docker-build docker-run
 
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
@@ -49,3 +49,12 @@ bundle:  ## Final tracker -> checkpoints/bundle/sam2-lite (model.safetensors + c
 
 app:  ## Gradio click-to-track demo on http://127.0.0.1:7860 (needs the 'app' dependency group)
 	uv run --group app python app/app.py
+
+api:  ## FastAPI service on http://127.0.0.1:8000 (docs at /docs; needs the 'api' dependency group)
+	uv run --group api uvicorn api.main:app --port 8000
+
+docker-build:  ## CPU image of the API (first build is slow: torch + building sam-2)
+	docker build -f api/Dockerfile -t sam2-lite-api .
+
+docker-run:  ## Serve the API from the image, with the local bundle and ONNX files mounted read-only
+	docker run --rm -p 8000:8000 -v $(PWD)/checkpoints:/app/checkpoints:ro sam2-lite-api
