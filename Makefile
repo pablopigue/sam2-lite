@@ -1,4 +1,4 @@
-.PHONY: setup checkpoints lint format test eval bench train profile train-memory export bundle
+.PHONY: setup checkpoints lint format test eval bench train profile train-memory export bundle app
 
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
@@ -46,3 +46,6 @@ export:  ## Student encoder -> ONNX (1024 and 576), checked against PyTorch with
 
 bundle:  ## Final tracker -> checkpoints/bundle/sam2-lite (model.safetensors + config.yaml)
 	uv run python -m sam2lite.export.bundle --config configs/export/bundle.yaml
+
+app:  ## Gradio click-to-track demo on http://127.0.0.1:7860 (needs the 'app' dependency group)
+	uv run --group app python app/app.py

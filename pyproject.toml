@@ -25,6 +25,9 @@ dependencies = [
 ]
 
 [dependency-groups]
+app = [
+    "gradio>=6.29.1",
+]
 dev = [
     "pytest",
     "ruff",

@@ -29,6 +29,15 @@ def test_read_video_cuts_and_subsamples(tmp_path: Path) -> None:
     assert abs(frames[1].mean() - 24) < 6  # source frame 3 (= 8 * 3), up to codec loss
 
 
+def test_read_video_downscales_keeping_aspect_ratio(tmp_path: Path) -> None:
+    path = tmp_path / "big.mp4"
+    make_video(path, seconds=0.5, fps=10, size=(320, 180))
+    frames, _ = read_video(str(path), max_seconds=1, target_fps=10, max_side=160)
+    assert frames[0].shape == (90, 160, 3)  # 320x180 -> 160x90
+    small, _ = read_video(str(path), max_seconds=1, target_fps=10, max_side=1000)
+    assert small[0].shape == (180, 320, 3)  # never upscaled
+
+
 def test_read_video_rejects_unreadable_files(tmp_path: Path) -> None:
     path = tmp_path / "not_a_video.mp4"
     path.write_text("hello")

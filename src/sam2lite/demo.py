@@ -18,8 +18,13 @@ from sam2.sam2_video_predictor import SAM2VideoPredictor
 from sam2lite.export.bundle import load_bundle
 
 
-def read_video(path: str, max_seconds: float, target_fps: float) -> tuple[list[np.ndarray], float]:
+def read_video(
+    path: str, max_seconds: float, target_fps: float, max_side: int | None = None
+) -> tuple[list[np.ndarray], float]:
     """RGB frames (H, W, 3, uint8) of the first `max_seconds`, subsampled to ~`target_fps`.
+
+    With `max_side`, larger frames are downscaled (aspect ratio kept) so a 4K upload neither
+    fills the memory nor produces a huge output video; the model resizes to 576/1024 anyway.
 
     Returns the frames and their actual frame rate (source fps / step).
     """
@@ -35,12 +40,22 @@ def read_video(path: str, max_seconds: float, target_fps: float) -> tuple[list[n
         if not ok:
             break
         if index % step == 0:
-            frames.append(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB))
+            frames.append(cv2.cvtColor(_fit(frame_bgr, max_side), cv2.COLOR_BGR2RGB))
         index += 1
     capture.release()
     if not frames:
         raise ValueError(f"no frames could be read from {path}")
     return frames, source_fps / step
+
+
+def _fit(frame: np.ndarray, max_side: int | None) -> np.ndarray:
+    """Downscale so the longer side is at most `max_side` (INTER_AREA: best for shrinking)."""
+    height, width = frame.shape[:2]
+    if max_side is None or max(height, width) <= max_side:
+        return frame
+    scale = max_side / max(height, width)
+    size = (round(width * scale), round(height * scale))
+    return cv2.resize(frame, size, interpolation=cv2.INTER_AREA)
 
 
 def load_tracker(cfg: DictConfig, model: str) -> SAM2VideoPredictor:

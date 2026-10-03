@@ -13,4 +13,5 @@ default_model: sam2-lite-mobile
 
 max_seconds: 10                  # longer uploads are cut
 target_fps: 8                    # frames are subsampled to about this rate before tracking
+max_side: 854                    # longer side of the frames (480p width); bigger uploads are downscaled
 threads: 2                       # torch + ONNX Runtime threads (= free Space vCPUs)
