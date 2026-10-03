@@ -19,10 +19,17 @@ dependencies = [
     "omegaconf",
     "mlflow",
     "scikit-image>=0.26.0",
+    "onnxruntime>=1.30.0",
 ]
 
 [dependency-groups]
-dev = ["pytest", "ruff", "pre-commit"]
+dev = [
+    "pytest",
+    "ruff",
+    "pre-commit",
+    "onnx>=1.23.1",
+    "onnxscript>=0.7.2",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.28,<0.12.0"]

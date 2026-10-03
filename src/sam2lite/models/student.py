@@ -57,6 +57,23 @@ def build_student(cfg: DictConfig) -> ImageEncoder:
     return ImageEncoder(trunk=trunk, neck=neck, scalp=teacher_encoder.scalp)
 
 
+def load_student(student_cfg: DictConfig, ckpt_path: str) -> ImageEncoder:
+    """Build the student and load a distillation checkpoint (step_*.pt or best.pt) on CPU.
+
+    The checkpoint is a dict whose "student" key holds the student's state_dict. Returned in
+    eval() mode: BatchNorm must use its stored statistics at inference, not per-batch ones.
+    """
+    # pretrained=False: the ImageNet weights would be overwritten anyway, so don't download them.
+    cfg = OmegaConf.merge(student_cfg, {"pretrained": False})
+    assert isinstance(cfg, DictConfig)
+    student = build_student(cfg)
+    # Load on CPU (the checkpoint may also hold CPU-only state); strict=True catches a checkpoint
+    # from a different architecture instead of silently loading part of it.
+    state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    student.load_state_dict(state["student"], strict=True)
+    return student.eval()
+
+
 def set_train_mode(model: nn.Module, freeze_bn: bool) -> None:
     """model.train(), optionally keeping every BatchNorm in eval mode (frozen statistics).
 

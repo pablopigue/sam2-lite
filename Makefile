@@ -1,4 +1,4 @@
-.PHONY: setup checkpoints lint format test eval bench train profile train-memory
+.PHONY: setup checkpoints lint format test eval bench train profile train-memory export
 
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
@@ -40,3 +40,6 @@ profile:  ## Per-component CPU time of a video frame (memory attention, decoder.
 
 train-memory:  ## Plan C2: distil the memory attention to K memory frames (resumes automatically)
 	uv run python -m sam2lite.train.distill_memory --config $(CONFIG)
+
+export:  ## Student encoder -> ONNX (1024 and 576), checked against PyTorch with ONNX Runtime
+	uv run python -m sam2lite.export.onnx --config configs/export/onnx.yaml

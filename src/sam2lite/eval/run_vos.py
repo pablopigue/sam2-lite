@@ -30,7 +30,7 @@ from sam2lite.data.davis import (
 )
 from sam2lite.eval.jf import evaluate
 from sam2lite.models.memory import limit_memory_frames
-from sam2lite.models.student import build_student
+from sam2lite.models.student import load_student
 from sam2lite.tracking import start_run
 
 
@@ -84,19 +84,9 @@ def use_student_encoder(
 ) -> None:
     """Replace predictor.image_encoder by the distilled student loaded from `ckpt_path`.
 
-    `ckpt_path` is a distillation checkpoint (step_*.pt or best.pt): a dict whose "student" key
-    holds the student's state_dict.
+    `ckpt_path` is a distillation checkpoint (step_*.pt or best.pt), see `load_student`.
     """
-    # pretrained=False: the ImageNet weights would be overwritten anyway, so don't download them.
-    cfg = OmegaConf.merge(student_cfg, {"pretrained": False})
-    assert isinstance(cfg, DictConfig)
-    student = build_student(cfg)
-    # Load on CPU (the checkpoint may also hold CPU-only state); strict=True catches a checkpoint
-    # from a different architecture instead of silently loading part of it.
-    state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-    student.load_state_dict(state["student"], strict=True)
-    # eval(): BatchNorm must use its stored statistics at inference, not per-batch ones.
-    predictor.image_encoder = student.to(device).eval()
+    predictor.image_encoder = load_student(student_cfg, ckpt_path).to(device)
 
 
 @torch.inference_mode()

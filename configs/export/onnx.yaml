@@ -1,0 +1,16 @@
+# Export the distilled student encoder to ONNX and check it against PyTorch with ONNX Runtime.
+# Override from the CLI, e.g.:  'image_sizes=[576]' 'check.videos=[blackswan]'  (quotes for zsh)
+
+student_config: configs/model/student_mnv4.yaml
+ckpt: checkpoints/distill/night1/best.pt   # sam2-lite and sam2-lite-mobile share these weights
+image_sizes: [1024, 576]                   # sam2-lite @1024, sam2-lite-mobile @576
+out_dir: checkpoints/onnx                  # git-ignored (*.onnx)
+opset: 18
+
+# Numerical check on real frames (first frame of each video), preprocessed exactly like SAM 2.
+check:
+  davis_root: data/raw/DAVIS
+  videos: [bike-packing, blackswan, cows, dog, india]
+  # Pass if max|onnx - torch| / max|torch| stays below this for every output and frame.
+  # fp32 kernels differ only in summation order, so errors should be ~1e-6..1e-5.
+  max_rel_error: 1.0e-4
