@@ -1,0 +1,40 @@
+# Lint + tests on every push and pull request. The tests need no dataset, checkpoint or GPU
+# (random weights or fake trackers), so they run on a standard CPU runner.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read  # the workflow only reads the code
+
+concurrency:  # a newer push to the same branch cancels the run in progress
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv (with a cache of downloaded packages, keyed on uv.lock)
+        uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install ffmpeg (H.264 tests; skipped without it)
+        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+
+      - name: Install the locked environment (same versions as local; fails if uv.lock is stale)
+        run: uv sync --locked --group api
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test

@@ -2113,6 +2113,7 @@ app = [
     { name = "spaces" },
 ]
 dev = [
+    { name = "httpx" },
     { name = "onnx" },
     { name = "onnxscript" },
     { name = "pre-commit" },
@@ -2147,6 +2148,7 @@ app = [
     { name = "spaces", specifier = ">=0.51.3" },
 ]
 dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "onnx", specifier = ">=1.23.1" },
     { name = "onnxscript", specifier = ">=0.7.2" },
     { name = "pre-commit" },
