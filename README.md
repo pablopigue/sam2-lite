@@ -2,7 +2,7 @@
 
 **SAM 2.1 video object segmentation 2.1× faster on CPU: a distilled mobile image encoder plus a memory attention distilled to attend to fewer frames — measured end to end, with every number traceable to an MLflow run.**
 
-> 🚧 Work in progress. Done: encoder distillation, memory attention distillation, evaluation, latency benchmark, profiling, model registry. Next: ONNX export, Hugging Face model + Gradio demo, CI with an evaluation gate.
+> 🚧 Work in progress. Done: encoder and memory attention distillation, a reduced-resolution mobile variant, evaluation, latency benchmark, profiling, model registry. Next: Hugging Face model + Gradio demo (both models), CI with an evaluation gate.
 
 ## The idea
 
@@ -42,6 +42,18 @@ Latency: median per frame after warmup (20 CPU / 50 GPU calls), full pipeline me
 
 **Acceptance criteria were fixed before the final results:** J&F drop ≤ 5 points and full-pipeline CPU speedup ≥ 1.25× (`configs/eval_gate.yaml`). Both are met.
 
+### Two operating points: sam2-lite and sam2-lite-mobile
+
+The same weights run at two input resolutions. `sam2-lite-mobile` targets modest devices; it is measured on 2 CPU threads, which is also what a free Hugging Face Space provides.
+
+| | Teacher @1024 | **sam2-lite** @1024 | **sam2-lite-mobile** @576 |
+|---|---|---|---|
+| J&F (DAVIS 2017 val) | 89.1 | 84.4 | 77.1 |
+| Full pipeline, CPU 2 threads (ms/frame) | 4949 | 2270 | **398** |
+| Speedup vs teacher (2 threads) | 1.0× | 2.2× | **12.4×** |
+
+The mobile variant meets its pre-registered latency target (≤ 600 ms with 2 threads) but **not** its quality target (J&F ≥ 80); see below. (Mobile runs: eval `ca473c99`, latency `b205e7be`; measured in a different session from the 1024 table, ~10 % run-to-run variation.)
+
 ## How we got there
 
 ### Step 1 — distil the encoder (1.33×)
@@ -72,6 +84,22 @@ Latencies in this table come from separate sessions (~10 % run-to-run variation)
 - SAM 2's memory is very redundant in the short term: dropping 4 of the 6 recent frames costs ~1 J&F point without any training. Keeping each memory frame's **temporal encoding** consistent with training matters (the conditioning frame uses the last learned encoding; `src/sam2lite/models/memory.py`).
 - Re-training the memory attention for 3 frames (feature distillation from the 7-frame original on DAVIS train clips) cut its feature error by 40 % but recovered only part of the J&F; combined with a memory **stride** of 4 (older frames for the same cost) it reaches 84.4.
 - Differences between 84.0 and 84.6 are of the order of the run-to-run noise (a single tiny object moves the mean by ~0.7 points), so the full curve is reported, not just the winner.
+
+### Step 3 — a reduced-resolution mobile variant
+
+Lowering the input to 576×576 divides the tokens per frame by ~3.2, which makes attention (quadratic in the tokens) much cheaper: 398 ms per frame with 2 threads. What it costs, and what did **not** help:
+
+| Experiment at 576 | J&F | CPU 2 threads |
+|---|---|---|
+| sam2-lite as is (night1 encoder, 3 memory frames) | **77.1** | **398 ms** |
+| Teacher (Hiera-T) at 576 — the realistic ceiling | 83.5 | 913 ms |
+| Encoder re-distilled at 576 from the teacher's 1024 features, area-pooled | 64.4 | 399 ms |
+| Encoder re-distilled at 576 from the teacher at 576 | 77.2 | 397 ms |
+| 5 / 7 memory frames | 77.0 / 77.4 | 482 / 567 ms |
+| MobileNetV4-**Large** encoder (4× parameters, 42k steps like night1) | 77.6 | 495 ms |
+
+- Pooling the teacher's 1024 features to the small grid broke tracking: the frozen memory and decoder expect the *distribution* of features computed from a 576 image, not smoother pooled ones. The encoder contract is about distributions, not only shapes.
+- Memory size does not matter at 576, and a 4× larger encoder imitates the teacher 12 % better but does not improve J&F at either resolution (84.6 at 1024). Together with earlier runs where lower distillation loss did not translate into J&F, this points at the distillation **data** (~3.8k frames from 54 videos) as the current bottleneck.
 
 ### What the student gets wrong
 
@@ -125,9 +153,10 @@ tests/              contract, preprocessing, memory, loss, data and tracking tes
 - **Found by smoke tests:** the random FPN neck had to be initialised at a small scale (untrained student features were ~1000× larger than the teacher's); BatchNorm statistics had to be frozen (micro-batches of 2 broke evaluation); the memory attention copy had to keep dropout off while training (otherwise the loss measured dropout noise and training made it worse).
 - Every reported number comes from an MLflow run with its full config and git commit; runs with uncommitted changes are not reported, and the model registry checks that the cited runs used exactly the registered configuration.
 
-## Future work: mobile, near real time
+## Future work
 
-Near real time (≥ 10 fps) on a phone needs more than this: with 3 memory frames the frame still costs ~920 ms on a laptop CPU in fp32, and the frame's own self-attention (~154 ms) would remain even with a free cross-attention. The main levers, by expected impact: (1) **input resolution 1024 → 512** (4× fewer pixels for the encoder, 4× fewer tokens per frame → ~16× cheaper attention), which requires re-distilling the encoder; (2) running on the phone's **GPU/NPU** in fp16/INT8 (Core ML, TFLite, ExecuTorch); (3) **compressing the memory tokens** of each frame (as EdgeTAM's Spatial Perceiver does), reusing this project's memory distillation pipeline.
+- **More distillation data:** unlabeled images or videos with a clear license and direct download; the experiments above suggest data, not model capacity, is the current limit.
+- **Mobile, near real time (≥ 10 fps):** run on the phone's GPU/NPU in fp16/INT8 (Core ML, TFLite, ExecuTorch) instead of fp32 PyTorch on CPU; then a larger encoder and compressed memory tokens (as EdgeTAM's Spatial Perceiver), reusing this project's memory distillation pipeline.
 
 ## Related work
 
@@ -135,7 +164,8 @@ MobileSAM, EdgeSAM, EfficientTAM and EdgeTAM also make SAM / SAM 2 lighter. Edge
 
 ## Licenses and citations
 
-- Code license: to be added. SAM 2 / SAM 2.1 code and weights: Apache 2.0.
+- **Code:** Apache License 2.0 (`LICENSE`); third-party credits in `NOTICE`. SAM 2 / SAM 2.1 code and weights: Apache 2.0.
+- **Models:** contain SAM 2.1 weights (Apache 2.0) and were distilled on DAVIS 2017 frames, so they are released for **non-commercial research use**.
 - `src/sam2lite/eval/third_party/sav_benchmark.py` is SAM 2's J&F evaluator, vendored unmodified with its licenses (BSD, SAM 2 Eval software; BSD 3-Clause, DAVIS; MIT, vos-benchmark).
 - DAVIS 2017 does not publish an explicit data license: its videos and frames are **not** redistributed in this repository or in any derived artifact, and this project is non-commercial.
 

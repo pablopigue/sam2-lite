@@ -1,0 +1,25 @@
+sam2-lite
+Copyright 2026 pablopigue
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product builds on and includes third-party work:
+
+- SAM 2 / SAM 2.1 (Meta Platforms, Inc.), Apache License 2.0
+  https://github.com/facebookresearch/sam2
+  Used as a library and as the teacher model. The released sam2-lite models contain SAM 2.1
+  weights (memory encoder, mask decoder and a fine-tuned memory attention).
+
+- src/sam2lite/eval/third_party/sav_benchmark.py: SAM 2's J&F evaluator, vendored unmodified,
+  with its licenses in the same folder:
+    BSD License, SAM 2 Eval software (Meta Platforms, Inc.)
+    BSD 3-Clause License, DAVIS: Densely Annotated VIdeo Segmentation (davis2017-evaluation)
+    MIT License, Rex Cheng (vos-benchmark)
+
+- timm (PyTorch Image Models), Apache License 2.0
+  https://github.com/huggingface/pytorch-image-models
+  Provides the MobileNetV4 backbone and its ImageNet-pretrained weights.
+
+The models were distilled on frames of the DAVIS 2017 dataset, which does not publish an
+explicit data license. No DAVIS videos or frames are redistributed, and the models are released
+for non-commercial research use.
