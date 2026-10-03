@@ -8,7 +8,14 @@ import cv2
 import numpy as np
 import pytest
 
-from sam2lite.demo import overlay_mask, read_video, write_mp4
+from sam2lite.demo import (
+    PALETTE,
+    overlay_mask,
+    overlay_masks,
+    read_video,
+    validate_clicks,
+    write_mp4,
+)
 
 
 def make_video(path: Path, seconds: float, fps: int, size: tuple[int, int] = (64, 48)) -> None:
@@ -65,3 +72,28 @@ def test_overlay_mask_blends_only_inside_the_mask() -> None:
     assert out[0, 0].tolist() == [150, 50, 50]  # 0.5 * 100 + 0.5 * color
     assert out[1, 1].tolist() == [100, 100, 100]
     assert frame[0, 0].tolist() == [100, 100, 100]  # input untouched
+
+
+def test_overlay_masks_uses_one_colour_per_object() -> None:
+    frame = np.zeros((1, 2, 3), dtype=np.uint8)
+    masks = {1: np.array([[True, False]]), 2: np.array([[False, True]])}
+    out = overlay_masks(frame, masks)
+    assert out[0, 0].tolist() == [c // 2 for c in PALETTE[0]]  # 0.5 * colour on black
+    assert out[0, 1].tolist() == [c // 2 for c in PALETTE[1]]
+
+
+@pytest.mark.parametrize(
+    ("clicks", "message"),
+    [
+        ([], "first"),  # nothing clicked
+        ([(1, 5, 5, 0)], "positive"),  # negatives alone select nothing
+        ([(1, 5, 5, 1), (2, 6, 6, 1), (3, 7, 7, 1), (4, 8, 8, 1)], "at most"),
+    ],
+)
+def test_validate_clicks_rejects_bad_prompts(clicks, message) -> None:
+    with pytest.raises(ValueError, match=message):
+        validate_clicks(clicks, max_objects=3)
+
+
+def test_validate_clicks_accepts_refined_objects() -> None:
+    validate_clicks([(1, 5, 5, 1), (1, 9, 9, 0), (2, 20, 20, 1)], max_objects=3)

@@ -1,6 +1,10 @@
 """Click-to-track logic shared by the Gradio app and the API (no UI code here).
 
-read_video -> load_tracker -> track (one click on the first frame) -> overlay_mask -> write_mp4.
+read_video -> load_tracker -> preview / track (clicks on the first frame) -> overlay_masks
+-> write_mp4.
+
+A click is (obj_id, x, y, label): label 1 = "part of this object", 0 = "not part of it". Several
+clicks with the same obj_id refine one object; different obj_ids are different objects.
 """
 
 import os
@@ -16,6 +20,10 @@ from omegaconf import DictConfig
 from sam2.sam2_video_predictor import SAM2VideoPredictor
 
 from sam2lite.export.bundle import load_bundle
+
+Click = tuple[int, int, int, int]  # (obj_id, x, y, label), x and y in first-frame pixels
+# One colour per object (RGB), distinguishable on most backgrounds.
+PALETTE = [(255, 64, 64), (64, 160, 255), (255, 200, 0), (180, 90, 255), (0, 210, 140)]
 
 
 def read_video(
@@ -71,26 +79,59 @@ def load_tracker(cfg: DictConfig, model: str) -> SAM2VideoPredictor:
     return load_bundle(bundle_dir, image_size=spec.image_size, onnx=str(onnx_dir / spec.onnx))
 
 
-@torch.inference_mode()
-def track(
-    predictor: SAM2VideoPredictor, frames: list[np.ndarray], point_xy: tuple[float, float]
-) -> list[np.ndarray]:
-    """Boolean mask (H, W) per frame for the object under `point_xy` (pixels, first frame)."""
+def validate_clicks(clicks: list[Click], max_objects: int) -> None:
+    """Every object needs a positive click (negatives alone select nothing); at most N objects."""
+    objects = {obj_id for obj_id, *_ in clicks}
+    if not objects:
+        raise ValueError("click the object to track first")
+    if len(objects) > max_objects:
+        raise ValueError(f"at most {max_objects} objects")
+    without_positive = objects - {obj_id for obj_id, _, _, label in clicks if label == 1}
+    if without_positive:
+        raise ValueError(f"object(s) {sorted(without_positive)} need at least one positive click")
+
+
+def _init_state(predictor: SAM2VideoPredictor, frames: list[np.ndarray]) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         # SAM 2 reads an .mp4 only through decord (not installed) or a folder of JPEGs.
         for i, frame in enumerate(frames):
             cv2.imwrite(f"{tmp}/{i:05d}.jpg", cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-        state = predictor.init_state(video_path=tmp)
-    predictor.add_new_points_or_box(
-        state,
-        frame_idx=0,
-        obj_id=1,
-        points=[list(point_xy)],
-        labels=[1],  # 1 = foreground
-    )
-    masks = [np.zeros(frames[0].shape[:2], dtype=bool)] * len(frames)
-    for frame_idx, _, mask_logits in predictor.propagate_in_video(state):
-        masks[frame_idx] = (mask_logits[0, 0] > 0).cpu().numpy()
+        return predictor.init_state(video_path=tmp)
+
+
+def _add_clicks(predictor: SAM2VideoPredictor, state: dict, clicks: list[Click]) -> dict:
+    """Add every object's clicks on frame 0; return {obj_id: mask} for frame 0."""
+    out: dict[int, np.ndarray] = {}
+    for obj_id in sorted({c[0] for c in clicks}):
+        points = [[x, y] for o, x, y, _ in clicks if o == obj_id]
+        labels = [label for o, _, _, label in clicks if o == obj_id]
+        _, obj_ids, mask_logits = predictor.add_new_points_or_box(
+            state, frame_idx=0, obj_id=obj_id, points=points, labels=labels
+        )
+        # Each call returns frame 0's masks for all objects added so far.
+        out = {o: (mask_logits[i, 0] > 0).cpu().numpy() for i, o in enumerate(obj_ids)}
+    return out
+
+
+@torch.inference_mode()
+def preview(
+    predictor: SAM2VideoPredictor, first_frame: np.ndarray, clicks: list[Click]
+) -> dict[int, np.ndarray]:
+    """Masks on the first frame only: a 1-frame state is cheap (one encoder call) and not kept,
+    unlike a whole video's state (all frames resized, ~1 GB for 80 frames at 1024)."""
+    return _add_clicks(predictor, _init_state(predictor, [first_frame]), clicks)
+
+
+@torch.inference_mode()
+def track(
+    predictor: SAM2VideoPredictor, frames: list[np.ndarray], clicks: list[Click]
+) -> list[dict[int, np.ndarray]]:
+    """{obj_id: boolean mask (H, W)} per frame, for every object defined by `clicks`."""
+    state = _init_state(predictor, frames)
+    _add_clicks(predictor, state, clicks)
+    masks: list[dict[int, np.ndarray]] = [{} for _ in frames]
+    for frame_idx, obj_ids, mask_logits in predictor.propagate_in_video(state):
+        masks[frame_idx] = {o: (mask_logits[i, 0] > 0).cpu().numpy() for i, o in enumerate(obj_ids)}
     return masks
 
 
@@ -102,6 +143,13 @@ def overlay_mask(
     # A convex combination of two values in [0, 255] stays in [0, 255].
     out[mask] = (0.5 * out[mask] + 0.5 * np.array(color)).astype(np.uint8)
     return out
+
+
+def overlay_masks(frame: np.ndarray, masks: dict[int, np.ndarray]) -> np.ndarray:
+    """`frame` with each object's mask in its own colour (PALETTE[obj_id - 1])."""
+    for obj_id, mask in sorted(masks.items()):
+        frame = overlay_mask(frame, mask, PALETTE[(obj_id - 1) % len(PALETTE)])
+    return frame
 
 
 def write_mp4(frames: list[np.ndarray], fps: float, path: str) -> None:
