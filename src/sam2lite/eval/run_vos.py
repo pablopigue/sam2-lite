@@ -29,6 +29,7 @@ from sam2lite.data.davis import (
     split_objects,
 )
 from sam2lite.eval.jf import evaluate
+from sam2lite.export.bundle import load_bundle
 from sam2lite.export.ort_encoder import load_ort_encoder
 from sam2lite.models.memory import limit_memory_frames
 from sam2lite.models.student import load_student
@@ -40,7 +41,10 @@ def build_predictor(cfg: DictConfig, device: str) -> SAM2VideoPredictor:
 
     With model.name == "student", the teacher's image encoder is replaced by the distilled
     student; memory attention, memory encoder and mask decoder stay SAM 2.1-tiny's.
+    With `bundle`, the whole tracker comes from one bundle (export/bundle.py) instead.
     """
+    if cfg.get("bundle"):
+        return load_bundle(cfg.bundle, cfg.get("image_size"), cfg.model.get("onnx"), device)
     overrides = [f"++model.non_overlap_masks={str(cfg.non_overlap_masks).lower()}"]
     if cfg.get("image_size"):  # mobile model: SAM 2 derives the token grid etc. from image_size
         overrides.append(f"++model.image_size={cfg.image_size}")
@@ -170,7 +174,9 @@ def main() -> None:
     if cfg.model.name not in ("teacher", "student"):
         # e.g. a shell variable passed as ONE argument: never fall back to the teacher silently
         raise ValueError(f"model.name must be 'teacher' or 'student', got {cfg.model.name!r}")
-    if cfg.model.name == "student" and not (cfg.model.ckpt or cfg.model.get("onnx")):
+    if cfg.model.name == "student" and not (
+        cfg.model.ckpt or cfg.model.get("onnx") or cfg.get("bundle")
+    ):
         raise ValueError("model.name=student needs model.ckpt=<distillation checkpoint>")
     print(OmegaConf.to_yaml(cfg))
     # The ONNX encoder runs on CPU (the deployment target), so the whole predictor does too.
@@ -183,6 +189,7 @@ def main() -> None:
     suffix += f"_s{cfg.memory_stride}" if cfg.get("memory_stride") else ""
     suffix += "_ft" if cfg.get("memory_ckpt") else ""
     suffix += "_onnx" if cfg.model.get("onnx") else ""
+    suffix += "_bundle" if cfg.get("bundle") else ""
     with start_run("vos-davis", run_name=f"{cfg.model.name}_{cfg.split}{suffix}", cfg=cfg):
         mlflow.set_tags({"device": device, "n_videos": str(len(videos))})
         if cfg.skip_inference:  # reuse predictions already in out_dir (no timing metrics)

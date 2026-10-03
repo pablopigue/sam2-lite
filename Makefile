@@ -1,4 +1,4 @@
-.PHONY: setup checkpoints lint format test eval bench train profile train-memory export
+.PHONY: setup checkpoints lint format test eval bench train profile train-memory export bundle
 
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
@@ -43,3 +43,6 @@ train-memory:  ## Plan C2: distil the memory attention to K memory frames (resum
 
 export:  ## Student encoder -> ONNX (1024 and 576), checked against PyTorch with ONNX Runtime
 	uv run python -m sam2lite.export.onnx --config configs/export/onnx.yaml
+
+bundle:  ## Final tracker -> checkpoints/bundle/sam2-lite (model.safetensors + config.yaml)
+	uv run python -m sam2lite.export.bundle --config configs/export/bundle.yaml

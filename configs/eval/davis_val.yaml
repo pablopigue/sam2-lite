@@ -16,6 +16,7 @@ memory_frames: null          # Plan C1: number of memory frames (null = SAM 2.1'
 memory_ckpt: null            # Plan C2: fine-tuned memory attention (best.pt), needs memory_frames
 memory_stride: null          # older memory frames every r-th frame (null = 1, the most recent)
 image_size: null             # model input resolution (null = SAM 2.1's 1024; mobile model: 512)
+bundle: null                 # final tracker bundle dir (make bundle): replaces model/memory_* keys
 
 # Same settings as the official SAM 2 evaluation (no hole filling, one PNG per frame).
 apply_postprocessing: false

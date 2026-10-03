@@ -1,0 +1,18 @@
+# The final tracker (sam2-lite v1, D-030) as one bundle: model.safetensors + config.yaml.
+# Same keys as configs/eval/davis_val.yaml, so the bundle is built by the evaluated code path.
+
+model:
+  name: student
+  config: configs/sam2.1/sam2.1_hiera_t.yaml   # resolved inside the installed sam2 package
+  checkpoint: checkpoints/sam2.1_hiera_tiny.pt # memory encoder + mask decoder weights
+  ckpt: checkpoints/distill/night1/best.pt     # distilled student encoder
+  onnx: null
+student_config: configs/model/student_mnv4.yaml
+memory_frames: 3
+memory_stride: 4
+memory_ckpt: checkpoints/memory/memory_k3/best.pt
+image_size: 1024             # default; sam2-lite-mobile loads the same bundle at 576
+apply_postprocessing: false
+non_overlap_masks: true
+
+out_dir: checkpoints/bundle/sam2-lite
