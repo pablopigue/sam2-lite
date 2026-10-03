@@ -38,3 +38,47 @@ jobs:
 
       - name: Test
         run: make test
+
+  # Model quality, not just code: the released tracker (bundle + ONNX encoder, CPU) must not
+  # regress on 3 DAVIS val videos (configs/eval_gate.yaml, D-050). Only on pushes to main, where
+  # the HF_TOKEN secret (read-only token for the private model repo) is available.
+  eval-gate:
+    needs: lint-and-test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install the locked environment
+        run: uv sync --locked
+
+      - name: Cache the DAVIS val videos used by the gate
+        id: davis
+        uses: actions/cache@v6
+        with:
+          path: data/raw/DAVIS
+          key: davis2017-480p-${{ hashFiles('configs/eval_gate.yaml') }}
+
+      - name: Download them from the official site (only on a cache miss; not redistributed)
+        if: steps.davis.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/davis.zip" \
+            https://data.vision.ee.ethz.ch/csergi/share/davis/DAVIS-2017-trainval-480p.zip
+          videos=$(uv run python -c "from omegaconf import OmegaConf; \
+            print(' '.join(OmegaConf.load('configs/eval_gate.yaml').ci.videos))")
+          mkdir -p data/raw
+          for v in $videos; do
+            unzip -q "$RUNNER_TEMP/davis.zip" "DAVIS/JPEGImages/480p/$v/*" \
+              "DAVIS/Annotations/480p/$v/*" -d data/raw
+          done
+
+      - name: Eval gate
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: make gate

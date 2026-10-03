@@ -10,8 +10,16 @@ quality:
 speed:                         # measured locally with configs/bench/latency.yaml, never in CI
   min_pipeline_speedup_cpu6t: 1.25   # teacher / student median ms per frame, full pipeline, 6 threads
 
-# The CI eval gate (Day 10) runs a mini-evaluation on 2-3 short DAVIS val videos; its threshold
-# will be derived from the teacher's score on those same videos with the same max_jf_drop.
+# CI eval gate: CI checks that a change does not make the champion worse on these videos.
+ci:
+  videos: [judo, car-shadow, motocross-jump]   # the 3 shortest val videos with 1+ objects (114 frames)
+  model_repo: Pablopigue/sam2-lite             # bundle + ONNX, downloaded with HF_TOKEN in CI
+  local_bundle: checkpoints/bundle/sam2-lite   # used instead when it exists (local runs)
+  local_onnx: checkpoints/onnx/student_encoder_r1024.onnx
+  onnx_file: student_encoder_r1024.onnx        # sam2-lite @1024, CPU + ONNX Runtime (deployment)
+  reference_jf: 81.80        # champion on these videos: MLflow run 45391c03 (git_dirty=False)
+  tolerance: 1.0             # numeric noise across CPUs/ONNX kernels is ~0.01; a real break costs more
+  teacher_jf: 90.73          # for context only: MLflow run 1568b8af
 
 # Mobile / low-resource model (sam2-lite-mobile), fixed BEFORE any result at reduced resolution
 # (02/10/2026, docs D-031). Measured on the laptop CPU with 2 threads = the free HF Space (2 vCPU).

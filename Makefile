@@ -1,4 +1,4 @@
-.PHONY: setup checkpoints lint format test eval bench train profile train-memory export bundle app api docker-build docker-run
+.PHONY: setup checkpoints lint format test eval bench train profile train-memory export bundle app api docker-build docker-run gate
 
 MODEL ?= teacher
 CONFIG ?= configs/train/smoke.yaml
@@ -58,3 +58,6 @@ docker-build:  ## CPU image of the API (first build is slow: torch + building sa
 
 docker-run:  ## Serve the API from the image, with the local bundle and ONNX files mounted read-only
 	docker run --rm -p 8000:8000 -v $(PWD)/checkpoints:/app/checkpoints:ro sam2-lite-api
+
+gate:  ## CI eval gate: J&F on 3 DAVIS val videos must not regress (configs/eval_gate.yaml, D-050)
+	uv run python scripts/eval_gate.py
