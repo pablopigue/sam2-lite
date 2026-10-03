@@ -61,38 +61,30 @@ The mobile variant meets its pre-registered latency target (≤ 600 ms with 2 th
 
 ## How we got there
 
-### Step 1 — distil the encoder (1.33×)
-
-The distilled encoder is 3.47× faster, but the full frame only got 1.33× faster — exactly what Amdahl's law predicted. Profiling one frame (CPU, 6 threads) explained why:
+**Step 1 — distil the encoder (1.33×).** The encoder became 3.47× faster but a whole frame only 1.33× faster, exactly as Amdahl's law predicted. Profiling one frame (CPU, 6 threads) showed why:
 
 | Component | Teacher | Student encoder, 7 memory frames |
 |---|---|---|
 | memory attention | 1163 ms (58.7 %) | **1186 ms (80.3 %)** |
 | image encoder | 749 ms (37.8 %) | 219 ms (14.8 %) |
-| memory encoder + mask decoder + rest | 70 ms (3.5 %) | 72 ms (4.9 %) |
+| rest (memory encoder, decoder…) | 70 ms (3.5 %) | 72 ms (4.9 %) |
 
-Inside the memory attention, the **cross-attention to memory is ~66 % of the frame**: ~4k tokens of the current frame against 28,728 memory tokens (7 frames × 64×64 + object pointers). Its cost is proportional to the number of memory frames.
+The cross-attention to memory alone is ~66 % of the frame, and its cost is proportional to the number of memory frames (7 × 64×64 tokens).
 
-### Step 2 — attend to fewer memory frames (2.13×)
+**Step 2 — attend to fewer memory frames (2.13×).**
 
-| Memory frames | J&F | CPU 6 threads | |
-|---|---|---|---|
-| 7 (SAM 2.1 default) | 84.9 | 1477 ms | |
-| 5, no training | 84.6 | 1186 ms | |
-| 3, no training | 84.0 | 922 ms | |
-| 3, memory attention distilled | 84.1 | 922 ms | |
-| **3, stride 4, memory attention distilled** | **84.4** | **920 ms** | final model |
-| 2, no training | 83.5 | 789 ms | |
+| Memory frames | J&F | CPU 6 threads |
+|---|---|---|
+| 7 (SAM 2.1 default) | 84.9 | 1477 ms |
+| 5, no training | 84.6 | 1186 ms |
+| 3, no training | 84.0 | 922 ms |
+| 3, memory attention distilled | 84.1 | 922 ms |
+| **3, stride 4, memory attention distilled (final model)** | **84.4** | **920 ms** |
+| 2, no training | 83.5 | 789 ms |
 
-Latencies in this table come from separate sessions (~10 % run-to-run variation); the final model's was re-measured in the same session as the teacher (table above).
+SAM 2's short-term memory is very redundant: dropping 4 of the 6 recent frames costs ~1 point without training, as long as each frame keeps its learned **temporal encoding** (`src/sam2lite/models/memory.py`). Re-training the memory attention for 3 frames and adding a memory stride of 4 recovers part of the gap. Differences of a few tenths are within run-to-run noise (one tiny object moves the mean by ~0.7); latencies in this table come from separate sessions.
 
-- SAM 2's memory is very redundant in the short term: dropping 4 of the 6 recent frames costs ~1 J&F point without any training. Keeping each memory frame's **temporal encoding** consistent with training matters (the conditioning frame uses the last learned encoding; `src/sam2lite/models/memory.py`).
-- Re-training the memory attention for 3 frames (feature distillation from the 7-frame original on DAVIS train clips) cut its feature error by 40 % but recovered only part of the J&F; combined with a memory **stride** of 4 (older frames for the same cost) it reaches 84.4.
-- Differences between 84.0 and 84.6 are of the order of the run-to-run noise (a single tiny object moves the mean by ~0.7 points), so the full curve is reported, not just the winner.
-
-### Step 3 — a reduced-resolution mobile variant
-
-Lowering the input to 576×576 divides the tokens per frame by ~3.2, which makes attention (quadratic in the tokens) much cheaper: 398 ms per frame with 2 threads. What it costs, and what did **not** help:
+**Step 3 — a reduced-resolution mobile variant.** At 576×576 attention gets much cheaper:
 
 | Experiment at 576 | J&F | CPU 2 threads |
 |---|---|---|
@@ -103,12 +95,7 @@ Lowering the input to 576×576 divides the tokens per frame by ~3.2, which makes
 | 5 / 7 memory frames | 77.0 / 77.4 | 482 / 567 ms |
 | MobileNetV4-**Large** encoder (4× parameters, 42k steps like night1) | 77.6 | 495 ms |
 
-- Pooling the teacher's 1024 features to the small grid broke tracking: the frozen memory and decoder expect the *distribution* of features computed from a 576 image, not smoother pooled ones. The encoder contract is about distributions, not only shapes.
-- Memory size does not matter at 576, and a 4× larger encoder imitates the teacher 12 % better but does not improve J&F at either resolution (84.6 at 1024). Together with earlier runs where lower distillation loss did not translate into J&F, this points at the distillation **data** (~3.8k frames from 54 videos) as the current bottleneck.
-
-### What the student gets wrong
-
-Per-object analysis (`scripts/compare_vos.py`): the J&F drop is not uniform. A few objects explain most of it — a tiny object (0.1 % of the image) lost after a few frames, and a rider and motorbike merged into one object in a close-up — while most objects lose ~2-3 points. A second encoder run that up-weighted the fine FPN levels improved their feature error but lowered J&F: the coarse level used by the memory matters more for tracking.
+Pooling the teacher's features broke tracking: the frozen memory and decoder expect the feature *distribution* of a 576 image, not only its shape. A 4× larger encoder imitates the teacher 12 % better but does not improve J&F (84.6 at 1024 either); with earlier runs where lower distillation loss did not translate into J&F (e.g. up-weighting the fine FPN levels lowered it), this points at the distillation **data** (~3.8k frames from 54 videos) as the current bottleneck.
 
 ### Where the teacher still wins
 
@@ -118,7 +105,7 @@ Same clip, same click, both at 1024 px: during a fast camera zoom-out the teache
 
 ## Limitations
 
-- **Accuracy:** −4.7 J&F on DAVIS 2017 val, concentrated in a few small or close-up objects; fast zooms are a visible failure case (above).
+- **Accuracy:** −4.7 J&F on DAVIS 2017 val, not uniform: a few objects explain most of it (a tiny object lost after a few frames, a rider and motorbike merged in a close-up) while most lose ~2-3 points (`scripts/compare_vos.py`); fast zooms are a visible failure case (above).
 - **sam2-lite-mobile** meets its latency target but not its quality target (77.1 < 80).
 - **Data:** distilled on ~3.8k frames from 54 DAVIS train videos; the experiments point at the data as the current bottleneck.
 - **Latency** was measured on one laptop CPU (i7-13620H); other hardware will differ.
@@ -145,7 +132,7 @@ The encoder gets faster but the pipeline only gains 5-8 %: the memory attention,
 - **HTTP API** (`make api`, FastAPI): `POST /track` (video + click) → mp4, `GET /health`, and a minimal web page at `/`.
 - **Docker** (`make docker-build && make docker-run`): CPU-only image of the API; weights are mounted or downloaded, never baked into the image.
 
-## MLOps
+## MLOps and engineering
 
 ```mermaid
 flowchart LR
@@ -159,9 +146,12 @@ flowchart LR
   C[CI on every push<br/>lint · tests · eval gate] --> B
 ```
 
-- **Every number is traceable:** each MLflow run stores its full config and git commit; runs from uncommitted code are refused by the scripts that build the tables and the registry.
-- **CI** (GitHub Actions): `ruff` and 66 tests on every push and PR, in a clean machine with the locked environment (`uv sync --locked`). The first CI run found a real bug: a `data/` rule in `.gitignore` had kept the `sam2lite.data` module out of git; it worked locally only because the files were on disk.
-- **Eval gate:** on every push to `main`, the released tracker (bundle + ONNX, CPU) is evaluated on 3 DAVIS val videos and the run fails if J&F drops more than 1.0 point below the champion's score on them (81.8). It is a **regression** gate: on these 3 videos the champion is 8.9 points below the teacher (vs 4.7 on the full set), so the full-val criterion does not transfer to a small subset; the quality criterion stays the full evaluation above. Latency is measured locally, never in CI (shared runners are noisy).
+- **Every number is traceable:** each MLflow run stores its full config and git commit; the scripts that build the tables and the model registry refuse runs from uncommitted code, and the registry checks that the cited runs used exactly the registered configuration.
+- **Tests (66, no dataset needed):** the student encoder must return the teacher's exact output structure (`tests/test_contract.py`) and the preprocessing matches SAM 2's video loader bit for bit (`tests/test_frames.py`).
+- **No data leakage:** training uses DAVIS 2017 *train* only, with 6 videos held out *by video* for validation; DAVIS 2017 val is used only for the final J&F.
+- **Found by smoke tests:** the random FPN neck had to start at a small scale (~1000× too large otherwise), BatchNorm had to be frozen (micro-batches of 2), and the memory attention copy had to keep dropout off while training.
+- **CI** (GitHub Actions): `ruff` and the tests on every push and PR, from the locked environment (`uv sync --locked`) in a clean machine. Its first run found a real bug: a `data/` rule in `.gitignore` had kept the `sam2lite.data` module out of git.
+- **Eval gate:** on every push to `main`, the released tracker (bundle + ONNX, CPU) is evaluated on 3 DAVIS val videos and fails if J&F drops more than 1.0 point below the champion's score on them (81.8). It is a **regression** gate: on these videos the champion is 8.9 points below the teacher (4.7 on the full set), so the full-val criterion does not transfer to a 3-video subset. Latency is measured locally, never in CI (shared runners are noisy).
 
 ## Reproduce
 
@@ -212,14 +202,6 @@ scripts/            entry points (checkpoints, analysis, result table, registry,
 tests/              66 tests: contract, preprocessing, memory, losses, data, ONNX, bundle, demo, API (no dataset needed)
 .github/workflows/  CI: lint, tests, eval gate
 ```
-
-## Engineering notes
-
-- **Contract test** (`tests/test_contract.py`): the student encoder must return the teacher encoder's exact output structure.
-- **Preprocessing** is checked bit-for-bit against SAM 2's own video loader (`tests/test_frames.py`).
-- **No data leakage:** training uses DAVIS 2017 *train* only; validation during distillation uses 6 train videos held out *by video*; DAVIS 2017 val is used only for the final J&F.
-- **Found by smoke tests:** the random FPN neck had to be initialised at a small scale (untrained student features were ~1000× larger than the teacher's); BatchNorm statistics had to be frozen (micro-batches of 2 broke evaluation); the memory attention copy had to keep dropout off while training (otherwise the loss measured dropout noise and training made it worse).
-- Every reported number comes from an MLflow run with its full config and git commit; runs with uncommitted changes are not reported, and the model registry checks that the cited runs used exactly the registered configuration.
 
 ## Future work
 
