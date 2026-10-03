@@ -66,8 +66,12 @@ def _fit(frame: np.ndarray, max_side: int | None) -> np.ndarray:
     return cv2.resize(frame, size, interpolation=cv2.INTER_AREA)
 
 
-def load_tracker(cfg: DictConfig, model: str) -> SAM2VideoPredictor:
-    """sam2-lite or sam2-lite-mobile (ONNX encoder), from the local bundle or the Hub."""
+def load_tracker(cfg: DictConfig, model: str, device: str = "cpu") -> SAM2VideoPredictor:
+    """sam2-lite or sam2-lite-mobile, from the local bundle or the Hub.
+
+    On CPU the encoder runs with ONNX Runtime (D-040); on GPU (the ZeroGPU Space) everything runs
+    in PyTorch, since the ONNX session is CPU-only.
+    """
     spec = cfg.models[model]
     torch.set_num_threads(cfg.threads)  # before building: the ONNX session copies this value
     if Path(cfg.local_bundle).exists():
@@ -76,7 +80,8 @@ def load_tracker(cfg: DictConfig, model: str) -> SAM2VideoPredictor:
         bundle_dir = onnx_dir = Path(
             snapshot_download(cfg.repo_id, token=os.environ.get("HF_TOKEN"))
         )
-    return load_bundle(bundle_dir, image_size=spec.image_size, onnx=str(onnx_dir / spec.onnx))
+    onnx = str(onnx_dir / spec.onnx) if device == "cpu" else None
+    return load_bundle(bundle_dir, image_size=spec.image_size, onnx=onnx, device=device)
 
 
 def _init_state(predictor: SAM2VideoPredictor, frames: list[np.ndarray]) -> dict:

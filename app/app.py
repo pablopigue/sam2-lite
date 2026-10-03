@@ -3,9 +3,11 @@
 All the logic lives in sam2lite.demo; this file is only the user interface.
 
 Run locally:
-    make app        # http://127.0.0.1:7860
+    make app                          # CPU, ONNX Runtime encoder: http://127.0.0.1:7860
+    SAM2LITE_DEVICE=cuda make app     # GPU, as in the ZeroGPU Space (D-046)
 """
 
+import os
 import re
 import tempfile
 import time
@@ -13,6 +15,8 @@ from pathlib import Path
 
 import gradio as gr
 import numpy as np
+import spaces
+import torch
 from omegaconf import OmegaConf
 from sam2.sam2_video_predictor import SAM2VideoPredictor
 
@@ -26,14 +30,21 @@ EXAMPLES_DIR = Path(CFG.examples.dir)
 # the name): selecting an example leaves only the Track button to press.
 EXAMPLE_CLICK = {v.name: tuple(v.clicks[0][1:3]) for v in CFG.examples.videos}
 HARD = next(v for v in CFG.examples.videos if v.get("hard"))
+# "cuda" in the ZeroGPU Space (a Space variable); "cpu" locally, the deployment target measured.
+DEVICE = os.environ.get("SAM2LITE_DEVICE", "cpu")
 _trackers: dict[str, SAM2VideoPredictor] = {}
 
 
 def get_tracker(model: str) -> SAM2VideoPredictor:
     """Load each model once per process (a few seconds), then reuse it for every request."""
     if model not in _trackers:
-        _trackers[model] = load_tracker(CFG, model)
+        _trackers[model] = load_tracker(CFG, model, DEVICE)
     return _trackers[model]
+
+
+if DEVICE == "cuda":  # ZeroGPU wants models placed on cuda at start-up, not inside a request
+    for _name in CFG.models:
+        get_tracker(_name)
 
 
 def draw_click(frame: np.ndarray, point: tuple[int, int]) -> np.ndarray:
@@ -51,8 +62,10 @@ def draw_click(frame: np.ndarray, point: tuple[int, int]) -> np.ndarray:
 def estimate(video: dict | None, model: str) -> str:
     if video is None:
         return ""
-    n = len(video["frames"])
-    return f"Ready: about {n * SECONDS_PER_FRAME[model]:.0f} s with {model} on 2 CPUs."
+    n, cpu = len(video["frames"]), SECONDS_PER_FRAME[model]
+    if DEVICE == "cuda":
+        return f"Ready · {n} frames · shared GPU (on a laptop CPU, 2 threads: ~{cpu:.2f} s/frame)."
+    return f"Ready · {n} frames · ~{cpu:.2f} s per frame with {model} (2 CPUs)."
 
 
 def on_upload(video_path: str | None, model: str):
@@ -76,15 +89,23 @@ def on_click(video: dict | None, model: str, evt: gr.SelectData):
     return draw_click(video["frames"][0], point), point, estimate(video, model)
 
 
+@spaces.GPU(duration=60)  # no effect outside ZeroGPU; there, a GPU only while this runs
+def run_tracking(frames: list[np.ndarray], point: tuple[int, int], model: str) -> list[dict]:
+    # bf16 on GPU, as in the official evaluation; full precision (and ONNX Runtime) on CPU.
+    with torch.autocast("cuda", dtype=torch.bfloat16, enabled=DEVICE == "cuda"):
+        return track(get_tracker(model), frames, [(1, *point, 1)])  # one positive click
+
+
 def on_track(video: dict | None, point: tuple[int, int] | None, model: str):
     if video is None or point is None:
         raise gr.Error("Upload a video and click the object first.")
     start = time.perf_counter()
-    masks = track(get_tracker(model), video["frames"], [(1, *point, 1)])  # one positive click
+    masks = run_tracking(video["frames"], point, model)  # drawing + encoding stay off the GPU
     frames = [overlay_masks(f, m) for f, m in zip(video["frames"], masks, strict=True)]
     out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
     write_mp4(frames, video["fps"], out_path)
-    return out_path, f"{model}: {len(frames)} frames in {time.perf_counter() - start:.0f} s."
+    seconds = time.perf_counter() - start
+    return out_path, f"{model}: {len(frames)} frames · {seconds / len(frames):.2f} s per frame."
 
 
 def credits() -> str:
@@ -132,6 +153,8 @@ LIMITS = f"""
 - One object per run, selected with one click on the first frame. A click can be ambiguous
   (part or whole: one car or the whole train); click the centre of the object.
 - Small or thin objects, fast zooms and close-ups of touching objects are the hardest cases.
+- This Space runs on a shared GPU (ZeroGPU) so it responds quickly; the CPU latencies above were
+  measured on a laptop CPU, which is what sam2-lite is optimised for.
 - **License:** non-commercial research use only (CC BY-NC 4.0). Contains SAM 2.1 weights by Meta
   (Apache 2.0, memory attention modified); encoder pretrained on ImageNet-1k; distilled on
   DAVIS 2017 (CC BY-NC 4.0).

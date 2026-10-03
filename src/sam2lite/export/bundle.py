@@ -22,13 +22,15 @@ from sam2.sam2_video_predictor import SAM2VideoPredictor
 from sam2lite.export.ort_encoder import load_ort_encoder
 from sam2lite.models.memory import limit_memory_frames
 from sam2lite.models.student import build_student
-from sam2lite.tracking import git_state
 
 WEIGHTS, CONFIG = "model.safetensors", "config.yaml"
 
 
 def bundle_config(cfg: DictConfig) -> DictConfig:
     """What `load_bundle` needs (from a run_vos-style config), plus where the weights came from."""
+    # Imported here: tracking pulls in MLflow, which loading a bundle (the Space) never needs.
+    from sam2lite.tracking import git_state
+
     student = OmegaConf.merge(OmegaConf.load(cfg.student_config), {"pretrained": False})
     return OmegaConf.create(
         {

@@ -27,6 +27,7 @@ dependencies = [
 [dependency-groups]
 app = [
     "gradio>=6.29.1",
+    "spaces>=0.51.3",
 ]
 dev = [
     "pytest",
