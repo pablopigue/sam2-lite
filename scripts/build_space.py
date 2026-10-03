@@ -1,4 +1,4 @@
-"""Stage the demo as a Hugging Face Space (ZeroGPU), and create/update it with --push.
+"""Stage the demo as a Hugging Face Space, and create/update it with --push.
 
 Staging (default) builds configs/publish/space.yaml's out_dir with the Space layout:
     README.md          Space config (YAML header) + short description
@@ -6,8 +6,9 @@ Staging (default) builds configs/publish/space.yaml's out_dir with the Space lay
     app/               app.py, style.css, examples/ and a copy of the sam2lite package
     configs/app.yaml   the app's settings
 The app runs as `python app/app.py` from the Space root, so `app/` is on sys.path: the package
-copy lives there. Review the folder, then --push creates the private Space, adds HF_TOKEN as a
-secret (the model repo is private) and SAM2LITE_DEVICE as a variable, and requests ZeroGPU.
+copy lives there. Review the folder, then --push creates the private Space (if missing), adds
+HF_TOKEN as a secret (the model repo is private) and SAM2LITE_DEVICE as a variable, uploads, and
+requests the configured hardware (or restarts the Space if it was paused).
 
 Example:
     uv run python scripts/build_space.py            # stage only
@@ -85,23 +86,28 @@ def read_token() -> str:
 def push(cfg: DictConfig, out: Path) -> None:
     token = read_token()
     api = HfApi(token=token)
-    # The hardware must be chosen at creation: the default (cpu-basic) needs PRO for Gradio
-    # Spaces and the request fails with 402 before any ZeroGPU setting could apply.
-    api.create_repo(
-        cfg.repo_id,
-        repo_type="space",
-        space_sdk="gradio",
-        space_hardware=cfg.hardware,
-        private=cfg.private,
-        exist_ok=True,
-    )
+    if not api.repo_exists(cfg.repo_id, repo_type="space"):
+        # Creating a ZeroGPU Space through the API can be refused (402) for free accounts that
+        # can still create it on the website (D-046): then create it there and push again.
+        # The hardware must be chosen at creation: the default, cpu-basic, needs PRO.
+        api.create_repo(
+            cfg.repo_id,
+            repo_type="space",
+            space_sdk="gradio",
+            space_hardware=cfg.hardware,
+            private=cfg.private,
+        )
     api.add_space_secret(cfg.repo_id, "HF_TOKEN", token)  # lets the Space read the private model
     for key, value in cfg.variables.items():
         api.add_space_variable(cfg.repo_id, key, str(value))
     api.upload_folder(
         repo_id=cfg.repo_id, repo_type="space", folder_path=out, commit_message="Update demo"
     )
-    api.request_space_hardware(cfg.repo_id, cfg.hardware)
+    runtime = api.get_space_runtime(cfg.repo_id)
+    if runtime.requested_hardware != cfg.hardware:
+        api.request_space_hardware(cfg.repo_id, cfg.hardware)
+    elif runtime.stage == "PAUSED":  # a new commit does not wake a paused Space up
+        api.restart_space(cfg.repo_id)
     print(f"Pushed to https://huggingface.co/spaces/{cfg.repo_id} (private={cfg.private})")
 
 

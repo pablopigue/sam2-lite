@@ -147,14 +147,19 @@ Same clip, same click, both at 1024 px. With a fast camera zoom-out the teacher 
 (lost in 0 % of the frames) while sam2-lite loses it in 28 %: large, fast changes of scale
 are where the smaller encoder still falls short, consistent with its −4.7 J&F on DAVIS.
 """
+HARDWARE_NOTE = (
+    "- This Space runs on a shared GPU (ZeroGPU) so it responds quickly; the CPU latencies above\n"
+    "  were measured on a laptop CPU, which is what sam2-lite is optimised for."
+    if DEVICE == "cuda"
+    else "- This Space runs on 2 CPU cores, like the latency numbers above (measured on a laptop)."
+)
 LIMITS = f"""
 - Only the first **{CFG.max_seconds} s** are used, subsampled to about **{CFG.target_fps} fps**,
   with the longer side reduced to {CFG.max_side} px: this Space has 2 CPU cores.
 - One object per run, selected with one click on the first frame. A click can be ambiguous
   (part or whole: one car or the whole train); click the centre of the object.
 - Small or thin objects, fast zooms and close-ups of touching objects are the hardest cases.
-- This Space runs on a shared GPU (ZeroGPU) so it responds quickly; the CPU latencies above were
-  measured on a laptop CPU, which is what sam2-lite is optimised for.
+{HARDWARE_NOTE}
 - **License:** non-commercial research use only (CC BY-NC 4.0). Contains SAM 2.1 weights by Meta
   (Apache 2.0, memory attention modified); encoder pretrained on ImageNet-1k; distilled on
   DAVIS 2017 (CC BY-NC 4.0).

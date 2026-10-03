@@ -1,11 +1,11 @@
-# Hugging Face Space for the demo (scripts/build_space.py). ZeroGPU (D-046): free accounts can host
-# up to 2 ZeroGPU Spaces; CPU Basic Gradio Spaces now need PRO.
+# Hugging Face Space for the demo (scripts/build_space.py). CPU Basic (D-046): the account's only
+# cpu-basic slot (free accounts get none for new Gradio Spaces; ZeroGPU was refused with 402).
 
 repo_id: Pablopigue/sam2-lite-demo
 private: true                    # until Pablo's final review
-hardware: zero-a10g
+hardware: cpu-basic
 out_dir: outputs/hf/space        # staging folder, reviewed before --push
-variables: {SAM2LITE_DEVICE: cuda}   # the app runs everything on the GPU (ONNX Runtime is CPU-only)
+variables: {SAM2LITE_DEVICE: cpu}    # 2 vCPU: ONNX Runtime encoder, as measured locally (D-040)
 # HF_TOKEN is added as a Space *secret* from .env: the model repo is private.
 
 readme:
@@ -15,23 +15,25 @@ readme:
   colorTo: purple
   sdk: gradio
   sdk_version: 6.29.1            # the version tested locally (uv.lock)
-  python_version: "3.12"         # ZeroGPU supports 3.10 and 3.12 only
+  python_version: "3.11"         # same as the project (uv)
   app_file: app/app.py
   license: cc-by-nc-4.0
-  short_description: SAM 2.1 video object tracking, distilled to run faster on CPU
+  short_description: Distilled SAM 2.1 video object tracking, faster on CPU  # max 60 chars
   models: [Pablopigue/sam2-lite]
   pinned: false
 
-# Python packages for the Space (gradio comes from sdk_version; spaces is preinstalled on ZeroGPU).
-# torch 2.13 is the newest version ZeroGPU supports; the rest match uv.lock.
+# Python packages for the Space (gradio comes from sdk_version). Versions match uv.lock; torch from
+# the CPU-only index (no NVIDIA libraries: a much smaller install on a CPU Space).
 requirements:
-  - torch==2.13.0
-  - torchvision==0.28.0
+  - --extra-index-url https://download.pytorch.org/whl/cpu
+  - torch==2.14.1+cpu
+  - torchvision==0.29.1+cpu
   - sam-2 @ git+https://github.com/facebookresearch/sam2@2b90b9f5ceec907a1c18123530e92e794ad901a4
   - timm==1.0.30
   - omegaconf==2.3.1
   - huggingface_hub==2.0.0
   - safetensors==0.8.0
-  - onnxruntime==1.30.0          # imported by sam2lite.export (not used on the GPU)
+  - onnxruntime==1.30.0          # the image encoder on CPU (D-040)
   - opencv-python-headless==5.0.0.93
+  - spaces==0.51.3               # @spaces.GPU is a no-op off ZeroGPU, but app.py imports it
 packages: [ffmpeg]               # apt packages: H.264 encoding for the browser (D-043)
