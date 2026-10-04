@@ -1,0 +1,12 @@
+sam2-lite models
+Copyright 2026 pablopigue
+
+The model files in this repository (model.safetensors, config.yaml, student_encoder_r1024.onnx
+and student_encoder_r576.onnx) are licensed under the Creative Commons
+Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0):
+https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+They contain SAM 2.1 weights by Meta Platforms, Inc. and timm weights, both released under the
+Apache License 2.0 (a copy is in LICENSE-APACHE-2.0); the SAM 2.1 weights included unchanged
+remain available under that license. NOTICE lists every part, what was modified and the data
+the models were trained on, which is why they are for non-commercial research use only.

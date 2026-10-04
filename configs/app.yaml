@@ -1,5 +1,5 @@
 # Click-to-track demo (app/app.py, src/sam2lite/demo.py).
-# The limits keep a free CPU Space (2 vCPU) responsive: ~36 frames at ~0.35 s/frame (mobile) or
+# The limits keep a 2-core CPU responsive: ~36 frames at ~0.35 s/frame (mobile) or
 # ~1.9 s/frame (sam2-lite) with 2 threads (D-043, D-045).
 
 repo_id: Pablopigue/sam2-lite   # private for now: needs HF_TOKEN (Space secret or .env)
@@ -14,7 +14,7 @@ default_model: sam2-lite-mobile
 max_seconds: 6                   # longer uploads are cut
 target_fps: 6                    # frames are subsampled to about this rate before tracking
 max_side: 854                    # longer side of the frames (480p width); bigger uploads are downscaled
-threads: 2                       # torch + ONNX Runtime threads (= free Space vCPUs)
+threads: 2                       # torch + ONNX Runtime threads (a modest 2-core CPU)
 
 # Headline numbers shown in the app header, copied from MLflow (run ids next to each value,
 # all git_dirty=False; same values as the model card).

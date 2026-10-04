@@ -26,7 +26,7 @@ DAVIS 2017 val (30 videos, semi-supervised, J&F), per-frame latency of the full 
 | CPU 2 threads (ms/frame) | $t2_teacher | $t2_lite | $t2_mobile |
 | Model size, fp32 (MB) | $mb_teacher | $mb_lite | $mb_lite |
 
-sam2-lite-mobile is the same weights at a 576×576 input; it was measured in a different session from the other latency numbers (~10 % run-to-run variation). 2 CPU threads ≈ a free Hugging Face CPU Space.
+sam2-lite-mobile is the same weights at a 576×576 input; it was measured in a different session from the other latency numbers (~10 % run-to-run variation). 2 CPU threads = a modest 2-core CPU.
 
 ### ONNX Runtime encoder
 
@@ -45,6 +45,7 @@ The encoder is faster but the pipeline gains little: the memory attention, which
 
 - `model.safetensors` + `config.yaml`: the whole tracker (student encoder, fine-tuned memory attention, SAM 2.1-tiny memory encoder and mask decoder) and what is needed to rebuild it.
 - `student_encoder_r1024.onnx`, `student_encoder_r576.onnx`: the image encoder for ONNX Runtime (CPU).
+- `LICENSE`, `LICENSE-APACHE-2.0`, `NOTICE`: see [License](#license).
 
 ## Usage
 
@@ -81,11 +82,11 @@ mobile = load_bundle(
 
 sam2-lite is an independent project; it is not affiliated with, endorsed by or sponsored by Meta. "SAM 2" refers to the original model by Meta FAIR, on which this work is based.
 
-Released for **non-commercial research use only** (CC BY-NC 4.0):
+Released under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) for **non-commercial research use only** (`LICENSE`); `NOTICE` details every part:
 
-- It contains SAM 2.1 weights (memory encoder and mask decoder, plus a **modified**, fine-tuned memory attention) by Meta Platforms, Inc., licensed under the Apache License 2.0 (see `LICENSE` and `NOTICE`).
-- The encoder starts from timm weights pretrained on ImageNet-1k, whose terms allow only non-commercial research and educational use.
-- It was distilled on DAVIS 2017 frames, licensed under CC BY-NC 4.0. No DAVIS videos, frames or annotations are included.
+- It contains SAM 2.1 weights by Meta Platforms, Inc., licensed under the Apache License 2.0 (`LICENSE-APACHE-2.0`). **Modified:** the memory attention (fine-tuned to attend to 3 memory frames instead of 7) and the memory temporal encodings (3 of the 7 kept). The other SAM 2.1 weights (memory encoder, prompt encoder, mask decoder, object pointers) are unchanged and remain available under the Apache License 2.0.
+- The image encoder starts from the timm weights [`mobilenetv4_conv_medium.e500_r224_in1k`](https://huggingface.co/timm/mobilenetv4_conv_medium.e500_r224_in1k) (Apache 2.0), **modified** by distillation. They were pretrained on ImageNet-1k, whose terms allow only non-commercial research and educational use.
+- It was distilled on frames of [DAVIS 2017](https://davischallenge.org), licensed under CC BY-NC 4.0; about half of its sequences come from third-party sources (mostly YouTube) with their own terms. No DAVIS videos, frames or annotations are included.
 
 ## Citations
 

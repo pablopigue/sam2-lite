@@ -1,5 +1,5 @@
-# Hugging Face Space for the demo (scripts/build_space.py). CPU Basic (D-046): the account's only
-# cpu-basic slot (free accounts get none for new Gradio Spaces; ZeroGPU was refused with 402).
+# Hugging Face Space for the demo (scripts/build_space.py). Prepared but PAUSED (D-046, D-053):
+# Gradio Spaces need a paid plan on this account (CPU Basic quota 0; ZeroGPU refused with 402).
 
 repo_id: Pablopigue/sam2-lite-demo
 private: true                    # until Pablo's final review
@@ -17,7 +17,7 @@ readme:
   sdk_version: 6.29.1            # the version tested locally (uv.lock)
   python_version: "3.11"         # same as the project (uv)
   app_file: app/app.py
-  license: cc-by-nc-4.0
+  license: apache-2.0            # the Space holds code; the README licenses the model and videos
   short_description: Distilled SAM 2.1 video object tracking, faster on CPU  # max 60 chars
   models: [Pablopigue/sam2-lite]
   pinned: false

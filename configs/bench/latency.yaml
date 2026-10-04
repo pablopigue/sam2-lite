@@ -18,7 +18,7 @@ non_overlap_masks: true
 
 devices: [cuda, cpu]
 # i7-13620H: 6 performance cores (12 threads) + 4 efficiency cores. 6 threads keeps the work on
-# the P-cores; 2 threads approximates a free Hugging Face CPU Space (2 vCPU).
+# the P-cores; 2 threads approximates a modest 2-core machine (e.g. a 2-vCPU CPU Space).
 cpu_threads: [6, 2]
 
 image_size: 1024              # model input resolution (mobile model: 512)

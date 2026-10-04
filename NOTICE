@@ -1,33 +1,47 @@
 sam2-lite
 Copyright 2026 pablopigue
 
-This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+sam2-lite is an independent project; it is not affiliated with, endorsed by or sponsored by
+Meta. "SAM 2" refers to the original model by Meta FAIR, on which this work is based.
 
-This product builds on and includes third-party work:
+The parts of sam2-lite are under different licenses:
 
-- SAM 2 / SAM 2.1 (Meta Platforms, Inc.), Apache License 2.0
-  https://github.com/facebookresearch/sam2
-  Used as a library and as the teacher model. The released sam2-lite models contain SAM 2.1
-  weights (memory encoder, mask decoder and a fine-tuned memory attention).
+1. Source code: Apache License 2.0, except for the files listed in 2 and 3. A copy of the
+   license is included: LICENSE in the source repository, LICENSE-APACHE-2.0 in the model
+   repository.
 
-- src/sam2lite/eval/third_party/sav_benchmark.py: SAM 2's J&F evaluator, vendored unmodified,
-  with its licenses in the same folder:
-    BSD License, SAM 2 Eval software (Meta Platforms, Inc.)
-    BSD 3-Clause License, DAVIS: Densely Annotated VIdeo Segmentation (davis2017-evaluation)
-    MIT License, Rex Cheng (vos-benchmark)
+2. src/sam2lite/eval/third_party/sav_benchmark.py: SAM 2's J&F evaluator, vendored unmodified
+   from https://github.com/facebookresearch/sam2, with its licenses in the
+   same folder:
+     LICENSE                BSD 3-Clause License, SAM 2 Eval software (Meta Platforms, Inc.)
+     LICENSE_DAVIS          BSD 3-Clause License, DAVIS (davis2017-evaluation)
+     LICENSE_VOS_BENCHMARK  MIT License, Rex Cheng (vos-benchmark)
 
-- timm (PyTorch Image Models), Apache License 2.0
-  https://github.com/huggingface/pytorch-image-models
-  Provides the MobileNetV4 backbone and its pretrained weights. The weights are tagged Apache 2.0
-  but were trained on ImageNet-1k, whose terms of access allow only non-commercial research and
-  educational use (https://image-net.org/download.php).
+3. Media, not under the Apache License: the example videos (app/examples/*.mp4) and the README
+   animations (assets/demo.gif, made from swans.mp4; assets/hard_case.gif, made from
+   train-viaduct_teacher_vs_student.mp4) are clips of Wikimedia Commons videos licensed under
+   CC BY 2.0 and CC BY 3.0: cut, re-encoded and, where noted, with masks drawn. Titles, authors,
+   sources and licenses: app/examples/ATTRIBUTION.md.
 
-- DAVIS 2017 dataset (Pont-Tuset et al., 2017; Perazzi et al., 2016), Creative Commons
-  Attribution-NonCommercial 4.0 (CC BY-NC 4.0), as stated in the README of the official
-  dataset package. https://creativecommons.org/licenses/by-nc/4.0/
-  Some sequences come from third-party online sources with their own terms of use (listed in
-  the package's SOURCES.md). The models were distilled on DAVIS 2017 train frames and evaluated
-  on DAVIS 2017 val. No DAVIS videos, frames or annotations are redistributed.
+4. Models (https://huggingface.co/Pablopigue/sam2-lite): Creative Commons
+   Attribution-NonCommercial 4.0 International (CC BY-NC 4.0),
+   https://creativecommons.org/licenses/by-nc/4.0/. For non-commercial research use only,
+   because of the data in 5 and 6. They contain:
+   - SAM 2.1 Hiera-tiny weights by Meta Platforms, Inc., Apache License 2.0,
+     https://github.com/facebookresearch/sam2. Modified: the memory attention (fine-tuned to
+     attend to 3 memory frames instead of 7) and the memory temporal encodings (3 of the 7
+     kept). The other SAM 2.1 weights (memory encoder, prompt encoder, mask decoder, object
+     pointers) are included unchanged and remain available under the Apache License 2.0.
+   - timm weights timm/mobilenetv4_conv_medium.e500_r224_in1k (Ross Wightman), Apache License
+     2.0, https://huggingface.co/timm/mobilenetv4_conv_medium.e500_r224_in1k. Modified: the
+     image encoder starts from them and was trained by distillation.
 
-Because of the ImageNet and DAVIS terms above, the released sam2-lite models are for
-non-commercial research use only.
+5. ImageNet-1k: the timm weights in 4 were trained on it, and its terms of access allow only
+   non-commercial research and educational use (https://image-net.org/download.php).
+
+6. DAVIS 2017 (https://davischallenge.org; Pont-Tuset et al., 2017; Perazzi et al., 2016):
+   CC BY-NC 4.0, as stated in the Terms of Use of the official dataset package. About half of
+   its sequences (31 of 60 in train, 15 of 30 in val) come from third-party online sources,
+   mostly YouTube, with their own terms of use (listed in the package's SOURCES.md). The models
+   were distilled on DAVIS 2017 train frames and evaluated on DAVIS 2017 val. No DAVIS videos,
+   frames or annotations are redistributed.

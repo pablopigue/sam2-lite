@@ -1,8 +1,8 @@
 """Stage the sam2-lite model repo for the Hugging Face Hub, and upload it with --push.
 
-Staging (default) builds configs/publish/hf.yaml's out_dir: the bundle, the ONNX encoders,
-LICENSE + NOTICE (Apache 2.0 section 4 for the SAM 2.1 weights) and a model card whose numbers
-are read from MLflow runs (git_dirty=False only), never typed by hand. Review it, then --push.
+Staging (default) builds configs/publish/hf.yaml's out_dir: the bundle, the ONNX encoders, the
+license files and a model card whose numbers are read from MLflow runs (git_dirty=False only),
+never typed by hand. Review it, then --push.
 
 Example:
     uv run python scripts/publish_hf.py            # stage only
@@ -78,8 +78,11 @@ def stage(cfg: DictConfig) -> Path:
         shutil.copy2(Path(cfg.bundle_dir) / name, out_dir / name)
     for path in cfg.onnx:
         shutil.copy2(path, out_dir / Path(path).name)
-    for name in ("LICENSE", "NOTICE"):
-        shutil.copy2(name, out_dir / name)
+    # The model is CC BY-NC 4.0 (LICENSE). It contains Apache 2.0 weights (SAM 2.1, timm), whose
+    # license text must ship with them (Apache 2.0 section 4a), and NOTICE says what each part is.
+    shutil.copy2(cfg.license, out_dir / "LICENSE")
+    shutil.copy2("LICENSE", out_dir / "LICENSE-APACHE-2.0")
+    shutil.copy2("NOTICE", out_dir / "NOTICE")
     # substitute (not safe_substitute): a placeholder without a value is an error.
     card = Template(Path(cfg.template).read_text()).substitute(card_values(cfg))
     (out_dir / "README.md").write_text(card)

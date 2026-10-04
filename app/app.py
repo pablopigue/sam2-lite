@@ -30,7 +30,7 @@ EXAMPLES_DIR = Path(CFG.examples.dir)
 # the name): selecting an example leaves only the Track button to press.
 EXAMPLE_CLICK = {v.name: tuple(v.clicks[0][1:3]) for v in CFG.examples.videos}
 HARD = next(v for v in CFG.examples.videos if v.get("hard"))
-# "cuda" in the ZeroGPU Space (a Space variable); "cpu" locally, the deployment target measured.
+# "cpu" by default (the measured deployment target); "cuda" for a local GPU or a ZeroGPU Space.
 DEVICE = os.environ.get("SAM2LITE_DEVICE", "cpu")
 _trackers: dict[str, SAM2VideoPredictor] = {}
 
@@ -148,21 +148,21 @@ Same clip, same click, both at 1024 px. With a fast camera zoom-out the teacher 
 are where the smaller encoder still falls short, consistent with its −4.7 J&F on DAVIS.
 """
 HARDWARE_NOTE = (
-    "- This Space runs on a shared GPU (ZeroGPU) so it responds quickly; the CPU latencies above\n"
-    "  were measured on a laptop CPU, which is what sam2-lite is optimised for."
+    "- Running on a GPU, so it responds quickly; the CPU latencies above were measured on a\n"
+    "  laptop CPU, which is what sam2-lite is optimised for."
     if DEVICE == "cuda"
-    else "- This Space runs on 2 CPU cores, like the latency numbers above (measured on a laptop)."
+    else f"- Running on CPU with {CFG.threads} threads, the setting of the latency numbers above."
 )
 LIMITS = f"""
 - Only the first **{CFG.max_seconds} s** are used, subsampled to about **{CFG.target_fps} fps**,
-  with the longer side reduced to {CFG.max_side} px: this Space has 2 CPU cores.
+  with the longer side reduced to {CFG.max_side} px, to stay responsive on a 2-core CPU.
 - One object per run, selected with one click on the first frame. A click can be ambiguous
   (part or whole: one car or the whole train); click the centre of the object.
 - Small or thin objects, fast zooms and close-ups of touching objects are the hardest cases.
 {HARDWARE_NOTE}
-- **License:** non-commercial research use only (CC BY-NC 4.0). Contains SAM 2.1 weights by Meta
-  (Apache 2.0, memory attention modified); encoder pretrained on ImageNet-1k; distilled on
-  DAVIS 2017 (CC BY-NC 4.0).
+- **Model license:** CC BY-NC 4.0, non-commercial research use only. Contains SAM 2.1 weights by
+  Meta (Apache 2.0, memory attention modified); encoder pretrained on ImageNet-1k; distilled on
+  DAVIS 2017 (CC BY-NC 4.0). App code: Apache 2.0; example videos: CC BY (credits below).
 """
 FOOTER = (
     '<div id="footer">sam2-lite is an independent project; it is not affiliated with, endorsed '

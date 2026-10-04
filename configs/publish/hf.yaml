@@ -6,6 +6,7 @@ private: true                  # first upload private: review on the Hub, then m
 bundle_dir: checkpoints/bundle/sam2-lite
 onnx: [checkpoints/onnx/student_encoder_r1024.onnx, checkpoints/onnx/student_encoder_r576.onnx]
 template: configs/publish/model_card.md
+license: configs/publish/model_license.txt  # the repo's LICENSE: the model is CC BY-NC 4.0
 out_dir: outputs/hf/sam2-lite  # staging folder, reviewed before --push
 github: https://github.com/pablopigue/sam2-lite
 
