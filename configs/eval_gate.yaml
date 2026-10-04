@@ -1,5 +1,5 @@
-# Plan A acceptance thresholds, fixed BEFORE the final results.
-# Decided on principle (quality/speed trade-off), not tuned to make the student pass. See docs D-020.
+# Acceptance thresholds, fixed BEFORE the final results.
+# Decided on principle (quality/speed trade-off), not tuned to make the student pass.
 
 teacher:
   jf_davis_val: 89.1          # MLflow run b44efdd1 (SAM 2.1 Hiera-T, DAVIS 2017 val, 30 videos)
@@ -21,8 +21,8 @@ ci:
   tolerance: 1.0             # numeric noise across CPUs/ONNX kernels is ~0.01; a real break costs more
   teacher_jf: 90.73          # for context only: MLflow run 1568b8af
 
-# Mobile / low-resource model (sam2-lite-mobile), fixed BEFORE any result at reduced resolution
-# (02/10/2026, docs D-031). Measured on the laptop CPU with 2 threads (a modest 2-core machine).
+# Mobile / low-resource model (sam2-lite-mobile), fixed BEFORE any result at reduced resolution.
+# Measured on the laptop CPU with 2 threads (a modest 2-core machine).
 mobile:
   min_jf: 80.0                       # DAVIS 2017 val (full)
   max_pipeline_ms_cpu2t: 600.0       # median ms per frame, full pipeline, configs/bench/latency.yaml

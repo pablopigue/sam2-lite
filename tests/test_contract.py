@@ -2,7 +2,7 @@
 
 Same dict keys, same number of levels, same shapes and dtypes, for [B, 3, 1024, 1024] inputs.
 If a change breaks this test, the change is wrong: SAM 2's memory and decoder consume these
-outputs unchanged. Both models use random weights (no downloads, runs in CI).
+outputs unchanged. Both models use random weights.
 """
 
 import copy

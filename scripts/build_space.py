@@ -96,9 +96,6 @@ def push(cfg: DictConfig, out: Path) -> None:
     token = read_token()
     api = HfApi(token=token)
     if not api.repo_exists(cfg.repo_id, repo_type="space"):
-        # Creating a ZeroGPU Space through the API can be refused (402) for free accounts that
-        # can still create it on the website (D-046): then create it there and push again.
-        # The hardware must be chosen at creation: the default, cpu-basic, needs PRO.
         api.create_repo(
             cfg.repo_id,
             repo_type="space",

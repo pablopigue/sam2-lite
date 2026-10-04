@@ -9,7 +9,7 @@ from typing import Any
 import mlflow
 from omegaconf import DictConfig, OmegaConf
 
-DEFAULT_TRACKING_URI = "sqlite:///mlflow.db"  # the Model Registry needs a database backend
+DEFAULT_TRACKING_URI = "sqlite:///mlflow.db"
 
 
 def flatten(d: dict[str, Any], prefix: str = "") -> dict[str, Any]:

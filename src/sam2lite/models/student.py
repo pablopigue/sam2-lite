@@ -27,7 +27,7 @@ class TimmTrunk(nn.Module):
         if strides != [4, 8, 16, 32]:
             raise ValueError(f"{name} with out_indices={out_indices} gives strides {strides}")
         # SAM 2's ImageEncoder asserts trunk.channel_list == neck.backbone_channel_list,
-        # which is ordered from LOW to HIGH resolution (e.g. Hiera-T: [768, 384, 192, 96]).
+        # which is ordered from LOW to HIGH resolution.
         self.channel_list = self.body.feature_info.channels()[::-1]
 
     def forward(self, x: torch.Tensor) -> list[torch.Tensor]:
@@ -63,11 +63,10 @@ def load_student(student_cfg: DictConfig, ckpt_path: str) -> ImageEncoder:
     The checkpoint is a dict whose "student" key holds the student's state_dict. Returned in
     eval() mode: BatchNorm must use its stored statistics at inference, not per-batch ones.
     """
-    # pretrained=False: the ImageNet weights would be overwritten anyway, so don't download them.
     cfg = OmegaConf.merge(student_cfg, {"pretrained": False})
     assert isinstance(cfg, DictConfig)
     student = build_student(cfg)
-    # Load on CPU (the checkpoint may also hold CPU-only state); strict=True catches a checkpoint
+    # Load on CPU; strict=True catches a checkpoint
     # from a different architecture instead of silently loading part of it.
     state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     student.load_state_dict(state["student"], strict=True)

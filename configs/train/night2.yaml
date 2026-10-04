@@ -1,4 +1,4 @@
-# Night 2: same as night 1 except ONE variable, the per-level loss weights (docs D-023).
+# Night 2: same as night 1 except ONE variable, the per-level loss weights.
 # Sized from smoke test: ~14.1 img/s with micro-batch 2 (4 gave no speed-up).
 # 42,000 steps x 8 images = 336,000 images ~ 89 epochs of the 3,783 train frames.
 
@@ -25,12 +25,12 @@ teacher:
 student_config: configs/model/student_mnv4.yaml
 
 loss:
-  weights: [2.193, 0.751, 0.056]   # inverse to teacher E[x^2] (0.00219, 0.00639, 0.08618), sum 3; D-023
+  weights: [2.193, 0.751, 0.056]   # inverse to teacher E[x^2] (0.00219, 0.00639, 0.08618), sum 3;
 
 batch_size: 2
 grad_accum: 4                # effective batch 8
 grad_clip: 1.0
-freeze_bn: true              # D-019
+freeze_bn: true
 
 optim:
   lr: 3.0e-4                 # lower than the smoke test (5e-4 gave a loss spike at peak lr)

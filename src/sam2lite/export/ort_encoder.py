@@ -28,8 +28,6 @@ class OrtImageEncoder(nn.Module):
         super().__init__()
         options = ort.SessionOptions()
         options.intra_op_num_threads = num_threads or torch.get_num_threads()
-        # By default ORT's threads busy-wait after each run, stealing the cores PyTorch needs for
-        # the rest of the pipeline (memory attention, decoder) between two encoder calls.
         options.add_session_config_entry("session.intra_op.allow_spinning", "0")
         self.session = ort.InferenceSession(
             onnx_path, sess_options=options, providers=["CPUExecutionProvider"]

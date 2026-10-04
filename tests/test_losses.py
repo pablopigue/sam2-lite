@@ -5,14 +5,13 @@ import torch
 
 from sam2lite.train.losses import distillation_loss
 
-SHAPES = [(2, 4, 8, 8), (2, 4, 4, 4), (2, 4, 2, 2)]  # 3 levels, high to low resolution
+SHAPES = [(2, 4, 8, 8), (2, 4, 4, 4), (2, 4, 2, 2)]  # high to low resolution
 
 
 def test_known_values() -> None:
     teacher = [torch.zeros(s) for s in SHAPES]
-    student = [torch.full(s, float(level + 1)) for level, s in enumerate(SHAPES)]  # 1, 2, 3
+    student = [torch.full(s, float(level + 1)) for level, s in enumerate(SHAPES)]
     total, per_level = distillation_loss(student, teacher, weights=[1.0, 0.5, 2.0])
-    # MSE per level = (level + 1)^2 = 1, 4, 9 ; total = 1*1 + 0.5*4 + 2*9 = 21
     assert [round(x.item(), 6) for x in per_level] == [1.0, 4.0, 9.0]
     assert total.item() == pytest.approx(21.0)
     assert total.dim() == 0

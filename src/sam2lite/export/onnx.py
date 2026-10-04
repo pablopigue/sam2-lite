@@ -54,8 +54,8 @@ def export(encoder: ImageEncoder, image_size: int, path: Path, opset: int) -> li
         input_names=[INPUT_NAME],
         output_names=output_names,
         opset_version=opset,
-        dynamo=True,  # torch.export-based exporter (the default since torch 2.9)
-        external_data=False,  # one self-contained file (~30 MB, far below protobuf's 2 GB)
+        dynamo=True,  # torch.export-based exporter
+        external_data=False,  # one self-contained file
     )
     return output_names
 
@@ -86,7 +86,7 @@ def check(encoder: ImageEncoder, path: Path, frames: torch.Tensor) -> dict[str, 
 def load_config() -> DictConfig:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", type=Path, default=Path("configs/export/onnx.yaml"))
-    args, overrides = parser.parse_known_args()  # the rest are OmegaConf `key=value` overrides
+    args, overrides = parser.parse_known_args()
     cfg = OmegaConf.merge(OmegaConf.load(args.config), OmegaConf.from_dotlist(overrides))
     assert isinstance(cfg, DictConfig), f"{args.config} must be a YAML mapping"
     OmegaConf.resolve(cfg)

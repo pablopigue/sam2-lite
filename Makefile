@@ -12,7 +12,7 @@ setup:  ## Install the locked environment and the git hooks
 checkpoints:  ## Download and verify the SAM 2.1 teacher weights
 	./scripts/download_checkpoints.sh
 
-lint:  ## Check style without modifying files (used by CI)
+lint:  ## Check style without modifying files
 	uv run ruff check .
 	uv run ruff format --check .
 
@@ -31,14 +31,14 @@ bench:  ## Per-frame latency (encoder + full pipeline, GPU and CPU), logged to M
 	uv run python -m sam2lite.bench.latency --config configs/bench/latency.yaml \
 		model.name=$(MODEL) $(if $(CKPT),model.ckpt=$(CKPT))
 
-train:  ## Distillation (resumes automatically from the last checkpoint of the run)
+train:  ## Distillation
 	uv run python -m sam2lite.train.distill --config $(CONFIG)
 
-profile:  ## Per-component CPU time of a video frame (memory attention, decoder...), logged to MLflow
+profile:  ## Per-component CPU time of a video frame logged to MLflow
 	uv run python -m sam2lite.bench.profile_pipeline --config configs/bench/latency.yaml \
 		model.name=$(MODEL) $(if $(CKPT),model.ckpt=$(CKPT))
 
-train-memory:  ## Plan C2: distil the memory attention to K memory frames (resumes automatically)
+train-memory:  ## Distil the memory attention to K memory frames
 	uv run python -m sam2lite.train.distill_memory --config $(CONFIG)
 
 export:  ## Student encoder -> ONNX (1024 and 576), checked against PyTorch with ONNX Runtime
@@ -47,17 +47,17 @@ export:  ## Student encoder -> ONNX (1024 and 576), checked against PyTorch with
 bundle:  ## Final tracker -> checkpoints/bundle/sam2-lite (model.safetensors + config.yaml)
 	uv run python -m sam2lite.export.bundle --config configs/export/bundle.yaml
 
-app:  ## Gradio click-to-track demo on http://127.0.0.1:7860 (needs the 'app' dependency group)
+app:  ## Gradio click-to-track demo on http://127.0.0.1:7860
 	uv run --group app python app/app.py
 
-api:  ## FastAPI service on http://127.0.0.1:8000 (docs at /docs; needs the 'api' dependency group)
+api:  ## FastAPI service on http://127.0.0.1:8000
 	uv run --group api uvicorn api.main:app --port 8000
 
-docker-build:  ## CPU image of the API (first build is slow: torch + building sam-2)
+docker-build:  ## CPU image of the API
 	docker build -f api/Dockerfile -t sam2-lite-api .
 
 docker-run:  ## Serve the API from the image, with the local bundle and ONNX files mounted read-only
 	docker run --rm -p 8000:8000 -v $(PWD)/checkpoints:/app/checkpoints:ro sam2-lite-api
 
-gate:  ## CI eval gate: J&F on 3 DAVIS val videos must not regress (configs/eval_gate.yaml, D-050)
+gate:  ## CI eval gate: J&F on 3 DAVIS val videos must not regress
 	uv run python scripts/eval_gate.py

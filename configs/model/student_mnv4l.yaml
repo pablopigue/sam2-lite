@@ -2,7 +2,7 @@
 # The neck hyperparameters are read from the teacher config; only the input channels change.
 
 name: student
-backbone: mobilenetv4_conv_large.e600_r384_in1k   # larger student (docs D-034/D-035)
+backbone: mobilenetv4_conv_large.e600_r384_in1k   # larger student
 pretrained: true
 out_indices: [1, 2, 3, 4]    # strides 4, 8, 16, 32 (drop the stride-2 level)
 teacher_config: configs/sam2.1/sam2.1_hiera_t.yaml  # inside the installed sam2 package

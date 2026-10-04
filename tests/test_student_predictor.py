@@ -32,7 +32,7 @@ def test_predictor_uses_student_with_checkpoint_weights(student_ckpt) -> None:
 
     encoder = predictor.image_encoder
     assert isinstance(encoder.trunk, TimmTrunk)  # not Hiera any more
-    assert not encoder.training  # inference mode (BatchNorm uses its statistics)
+    assert not encoder.training  # inference mode
     for name, tensor in encoder.state_dict().items():
-        assert torch.equal(tensor, weights[name]), name  # the distilled weights, not fresh ones
+        assert torch.equal(tensor, weights[name]), name  # the distilled weights
     assert next(encoder.parameters()).device.type == "cpu"

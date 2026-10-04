@@ -2,7 +2,7 @@
 # Every number in the model card comes from these runs (git_dirty=False is enforced).
 
 repo_id: Pablopigue/sam2-lite
-private: true                  # first upload private: review on the Hub, then make it public
+private: true                  # first upload private
 bundle_dir: checkpoints/bundle/sam2-lite
 onnx: [checkpoints/onnx/student_encoder_r1024.onnx, checkpoints/onnx/student_encoder_r576.onnx]
 template: configs/publish/model_card.md
@@ -19,7 +19,7 @@ runs:
     teacher: a0b4ebcc
     sam2_lite: a384f235
     mobile: b205e7be           # different session from the 1024 runs (~10 % run-to-run)
-  onnx:                        # D-040: same session, PyTorch vs ONNX Runtime
+  onnx:                        # Same session, PyTorch vs ONNX Runtime
     torch_1024: af0d9753
     onnx_1024: 7baca321
     torch_576: 79a6f48c

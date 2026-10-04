@@ -39,7 +39,7 @@ def time_calls(fn: Callable[[], object], device: str, warmup: int, iters: int) -
         start = time.perf_counter()
         fn()
         if on_gpu:
-            torch.cuda.synchronize()  # CUDA calls return before the GPU finishes: wait for it
+            torch.cuda.synchronize()  # CUDA calls return before the GPU finishes
         times_ms.append((time.perf_counter() - start) * 1000)
     return np.array(times_ms)
 
@@ -99,7 +99,6 @@ def hardware_tags() -> dict[str, str]:
 def main() -> None:
     cfg = load_config()
     if cfg.model.name not in ("teacher", "student"):
-        # e.g. a shell variable passed as ONE argument: never fall back to the teacher silently
         raise ValueError(f"model.name must be 'teacher' or 'student', got {cfg.model.name!r}")
     if cfg.model.name == "student":
         if not (cfg.model.ckpt or cfg.model.get("onnx")):
@@ -121,7 +120,7 @@ def main() -> None:
         print(table)
         mlflow.log_text(table, "latency_table.txt")
         for device, threads, name, stats in results:
-            key = device if threads is None else f"{device}{threads}t"  # e.g. cpu6t_encoder
+            key = device if threads is None else f"{device}{threads}t"
             mlflow.log_metric(f"{key}_{name}_median_ms", stats["median_ms"])
             mlflow.log_metric(f"{key}_{name}_p90_ms", stats["p90_ms"])
 

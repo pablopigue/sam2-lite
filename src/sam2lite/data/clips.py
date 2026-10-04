@@ -17,7 +17,7 @@ from torch.utils.data import Dataset
 from sam2lite.data.davis import annotation_paths, frame_paths, load_annotation, split_objects
 from sam2lite.data.frames import FrameDataset
 
-IGNORE_ID = 255  # "ignore" label present in some DAVIS train annotations (e.g. tennis)
+IGNORE_ID = 255  # "ignore" label present in some DAVIS train annotations
 
 
 def prepare_mask(mask: np.ndarray, image_size: int) -> torch.Tensor:

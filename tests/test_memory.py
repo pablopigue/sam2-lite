@@ -1,4 +1,4 @@
-"""limit_memory_frames must keep each memory frame's temporal encoding (no training, C1)."""
+"""limit_memory_frames must keep each memory frame's temporal encoding."""
 
 import pytest
 import torch
@@ -31,7 +31,7 @@ def test_memory_frames_keep_their_temporal_encoding(original_tpos, num_frames) -
     assert predictor.num_maskmem == num_frames
     new = predictor.maskmem_tpos_enc
     assert new.shape == (num_frames, 1, 1, 64)
-    # Conditioning frame (t_pos = 0) keeps the last original encoding.
+    # Conditioning frame keeps the last original encoding.
     torch.testing.assert_close(new[tpos_index(num_frames, 0)], original_tpos[-1])
     # A frame t_rel steps back keeps the encoding it had with 7 memory frames.
     for t_rel in range(1, num_frames):

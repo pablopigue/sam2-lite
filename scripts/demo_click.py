@@ -22,7 +22,7 @@ def overlay_mask(frame_bgr: np.ndarray, mask: np.ndarray) -> np.ndarray:
     alpha = 0.5
     color = np.array([0, 0, 255])  # red in BGR
     out = np.copy(frame_bgr)
-    # Alpha blending on the masked pixels only; a convex combination stays within [0, 255].
+    # Alpha blending on the masked pixels only.
     out[mask] = ((1 - alpha) * out[mask] + alpha * color).astype(np.uint8)
     return out
 

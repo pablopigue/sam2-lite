@@ -45,7 +45,7 @@ def test_augmented_sample_shape_and_reproducibility(video_dir: Path) -> None:
     torch.manual_seed(0)
     again = dataset[0]
     assert first.shape == (3, 1024, 1024) and first.dtype == torch.float32
-    assert torch.equal(first, again)  # same seed -> same augmentation
+    assert torch.equal(first, again)  # same seed = same augmentation
 
 
 def test_extra_size_returns_the_same_frame_at_two_resolutions(video_dir: Path) -> None:

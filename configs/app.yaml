@@ -1,12 +1,12 @@
 # Click-to-track demo (app/app.py, src/sam2lite/demo.py).
 # The limits keep a 2-core CPU responsive: ~36 frames at ~0.35 s/frame (mobile) or
-# ~1.9 s/frame (sam2-lite) with 2 threads (D-043, D-045).
+# ~1.9 s/frame (sam2-lite) with 2 threads.
 
-repo_id: Pablopigue/sam2-lite   # private for now: needs HF_TOKEN (Space secret or .env)
+repo_id: Pablopigue/sam2-lite
 local_bundle: checkpoints/bundle/sam2-lite   # used instead of the Hub if it exists (local dev)
 local_onnx_dir: checkpoints/onnx
 
-models:                          # same weights, two input resolutions (D-034, D-041)
+models:                          # same weights, two input resolutions
   sam2-lite-mobile: {image_size: 576, onnx: student_encoder_r576.onnx}
   sam2-lite: {image_size: 1024, onnx: student_encoder_r1024.onnx}
 default_model: sam2-lite-mobile
@@ -16,8 +16,7 @@ target_fps: 6                    # frames are subsampled to about this rate befo
 max_side: 854                    # longer side of the frames (480p width); bigger uploads are downscaled
 threads: 2                       # torch + ONNX Runtime threads (a modest 2-core CPU)
 
-# Headline numbers shown in the app header, copied from MLflow (run ids next to each value,
-# all git_dirty=False; same values as the model card).
+# Headline numbers shown in the app header, copied from MLflow.
 stats:
   speedup_cpu: "2.13×"          # pipeline, CPU 6 threads: a0b4ebcc / a384f235
   jf_lite: "84.4"               # DAVIS 2017 val J&F: 62e59f5e

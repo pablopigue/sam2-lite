@@ -4,7 +4,7 @@ read_video -> load_tracker -> track (clicks on the first frame) -> overlay_masks
 
 A click is (obj_id, x, y, label): label 1 = "part of this object", 0 = "not part of it". Several
 clicks with the same obj_id refine one object; different obj_ids are different objects. The app
-uses one positive click (simplest and fastest, D-045); the API keeps the general form.
+uses one positive click; the API keeps the general form.
 """
 
 import os
@@ -69,14 +69,14 @@ def _fit(frame: np.ndarray, max_side: int | None) -> np.ndarray:
 def load_tracker(cfg: DictConfig, model: str, device: str = "cpu") -> SAM2VideoPredictor:
     """sam2-lite or sam2-lite-mobile, from the local bundle or the Hub.
 
-    On CPU the encoder runs with ONNX Runtime (D-040); on GPU (the ZeroGPU Space) everything runs
+    On CPU the encoder runs with ONNX Runtime; on GPU everything runs
     in PyTorch, since the ONNX session is CPU-only.
     """
     spec = cfg.models[model]
     torch.set_num_threads(cfg.threads)  # before building: the ONNX session copies this value
     if Path(cfg.local_bundle).exists():
         bundle_dir, onnx_dir = Path(cfg.local_bundle), Path(cfg.local_onnx_dir)
-    else:  # private repo: the token comes from HF_TOKEN (Space secret or .env), never the code
+    else:  # private repo the token comes from HF_TOKEN in .env, never the code
         bundle_dir = onnx_dir = Path(
             snapshot_download(cfg.repo_id, token=os.environ.get("HF_TOKEN"))
         )
@@ -86,7 +86,7 @@ def load_tracker(cfg: DictConfig, model: str, device: str = "cpu") -> SAM2VideoP
 
 def _init_state(predictor: SAM2VideoPredictor, frames: list[np.ndarray]) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
-        # SAM 2 reads an .mp4 only through decord (not installed) or a folder of JPEGs.
+        # SAM 2 reads an .mp4 only through decord or a folder of JPEGs.
         for i, frame in enumerate(frames):
             cv2.imwrite(f"{tmp}/{i:05d}.jpg", cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
         return predictor.init_state(video_path=tmp)
@@ -124,7 +124,7 @@ def overlay_mask(
 ) -> np.ndarray:
     """Copy of `frame` (H, W, 3, uint8) with `color` alpha-blended (0.5) on the boolean mask."""
     out = frame.copy()
-    # A convex combination of two values in [0, 255] stays in [0, 255].
+    # A convex combination of two values in [0, 255].
     out[mask] = (0.5 * out[mask] + 0.5 * np.array(color)).astype(np.uint8)
     return out
 

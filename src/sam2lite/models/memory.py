@@ -1,4 +1,4 @@
-"""Inference-time changes to SAM 2's memory (Plan C, stage C1: no training).
+"""Inference-time changes to SAM 2's memory.
 
 SAM 2.1 attends to `num_maskmem = 7` memory frames: the conditioning frame (the one with the
 input mask/clicks) plus the 6 most recent frames. Each memory frame gets a learned temporal

@@ -28,15 +28,15 @@ dist/
 .coverage
 htmlcov/
 
-# Configuración personal de Claude Code (solo en local)
+# Configuración personal de Claude Code
 .claude/
 CLAUDE.md
 
-# Documentación de trabajo (local hasta el final del proyecto)
+# Documentación de trabajo
 docs/
 
 # Sistema
 .DS_Store
 
-# Guía de estudio personal (local)
+# Guía de estudio personal
 Guía_estudio.md

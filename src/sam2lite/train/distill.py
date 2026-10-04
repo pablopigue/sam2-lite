@@ -59,7 +59,7 @@ def train_step(
     sums: dict[str, float] = {}
     for batch in micro_batches:
         t_images, s_images = split_images(batch)
-        # Teacher: frozen and without autograd graph (its activations are not kept in VRAM).
+        # Teacher: frozen and without autograd graph.
         with torch.no_grad(), torch.autocast("cuda", dtype=torch.bfloat16):
             t_fpn = teacher(t_images)["backbone_fpn"]
         with torch.autocast("cuda", dtype=torch.bfloat16):
@@ -131,7 +131,7 @@ def build_loaders(cfg: DictConfig, start_step: int) -> tuple[Iterator, DataLoade
         val_paths = rng.sample(val_paths, cfg.data.max_val_images)
 
     common = {"batch_size": cfg.batch_size, "num_workers": cfg.data.num_workers, "pin_memory": True}
-    extra = cfg.get("student_image_size")  # reduced-resolution student (mobile model)
+    extra = cfg.get("student_image_size")  # reduced-resolution student for mobile model
     train_set = FrameDataset(train_paths, cfg.data.image_size, cfg.data.augment, extra)
     val_set = FrameDataset(val_paths, cfg.data.image_size, extra_size=extra)
     # Seed depends on the start step: a resumed run gets a new, but reproducible, data order.
@@ -185,7 +185,7 @@ def main() -> None:
 
     teacher = build_teacher(cfg)
     student = build_student(cfg.student).cuda()
-    if cfg.get("init_student"):  # fine-tune an already distilled student (e.g. night1)
+    if cfg.get("init_student"):  # fine-tune an already distilled student
         init = torch.load(cfg.init_student, map_location="cpu", weights_only=False)["student"]
         student.load_state_dict(init, strict=True)
     set_train_mode(student, cfg.freeze_bn)
@@ -238,7 +238,7 @@ def main() -> None:
                 val = evaluate(teacher, student, val_loader, weights, cfg.freeze_bn)
                 mlflow.log_metrics({f"val/{k}": v for k, v in val.items()}, step=done)
                 print(f"step {done} val loss {val['loss']:.5f}")
-                if val["loss"] < best_val:  # selected on the held-out TRAIN videos, never DAVIS val
+                if val["loss"] < best_val:  # selected on the held-out TRAIN videos
                     best_val = val["loss"]
                     best = {"step": done, "val_loss": best_val, "student": student.state_dict()}
                     Path(cfg.checkpoint.dir).mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,4 @@
-"""Plan C2: distil SAM 2.1's memory attention (7 memory frames) into a copy that uses K frames.
+"""Distil SAM 2.1's memory attention (7 memory frames) into a copy that uses K frames.
 
 For every clip, the frozen SAM 2.1 tracker (night1 student encoder + original memory/decoder)
 builds the memory bank frame by frame, exactly as at inference. At each frame t >= 1:
@@ -86,7 +86,7 @@ def clip_losses(
         feats_t = [x[:, t : t + 1] for x in feats]  # frame t, every level: [HW, 1, C]
         pos_t = [x[:, t : t + 1] for x in pos]
 
-        if t > 0:  # memory bank = frames < t (frame t is added to output_dict below)
+        if t > 0:  # memory bank = frames < t
             args = (model, t, feats_t, pos_t, sizes, output_dict, num_frames)
             with torch.no_grad(), torch.autocast(**bf16):
                 target = memory_conditioned(*args)  # teacher: original attention, 7 frames
@@ -167,7 +167,7 @@ def main() -> None:
     model = build_predictor(cfg.predictor, "cuda")  # eval mode, all frozen
     model.requires_grad_(False)
     # eval(): dropout OFF, like the (deterministic) teacher, so the loss measures imitation and
-    # not dropout noise. Gradients still flow: they depend on requires_grad, not on the mode.
+    # not dropout noise.
     student = copy.deepcopy(model.memory_attention).eval().requires_grad_(True)
 
     optimizer = torch.optim.AdamW(
@@ -224,7 +224,7 @@ def main() -> None:
                     f"step {done} val loss {val['loss']:.6f} "
                     f"(untrained K={k}: {val['loss_untrained_k']:.6f})"
                 )
-                if val["loss"] < best_val:  # held-out TRAIN videos, never DAVIS val
+                if val["loss"] < best_val:  # held-out TRAIN videos
                     best_val = val["loss"]
                     Path(cfg.checkpoint.dir).mkdir(parents=True, exist_ok=True)
                     torch.save(

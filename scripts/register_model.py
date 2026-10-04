@@ -64,8 +64,6 @@ def main() -> None:
             name="student_encoder",
             registered_model_name=MODEL_NAME,
             extra_files=[args.student_config],
-            # MLflow 3 defaults to 'pt2' (torch.export graph); the graph export is done on Day 8
-            # with ONNX and numerical checks, so the registry keeps the plain module.
             serialization_format="pickle",
         )
     version = info.registered_model_version

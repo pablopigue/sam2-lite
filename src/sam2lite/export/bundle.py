@@ -28,7 +28,7 @@ WEIGHTS, CONFIG = "model.safetensors", "config.yaml"
 
 def bundle_config(cfg: DictConfig) -> DictConfig:
     """What `load_bundle` needs (from a run_vos-style config), plus where the weights came from."""
-    # Imported here: tracking pulls in MLflow, which loading a bundle (the Space) never needs.
+    # Imported here: tracking pulls in MLflow, which loading a bundle never needs.
     from sam2lite.tracking import git_state
 
     student = OmegaConf.merge(OmegaConf.load(cfg.student_config), {"pretrained": False})

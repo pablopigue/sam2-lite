@@ -1,12 +1,11 @@
-# Hugging Face Space for the demo (scripts/build_space.py). Prepared but PAUSED (D-046, D-053):
+# Hugging Face Space for the demo (scripts/build_space.py). Prepared but PAUSED:
 # Gradio Spaces need a paid plan on this account (CPU Basic quota 0; ZeroGPU refused with 402).
 
 repo_id: Pablopigue/sam2-lite-demo
-private: true                    # until Pablo's final review
+private: true
 hardware: cpu-basic
 out_dir: outputs/hf/space        # staging folder, reviewed before --push
-variables: {SAM2LITE_DEVICE: cpu}    # 2 vCPU: ONNX Runtime encoder, as measured locally (D-040)
-# HF_TOKEN is added as a Space *secret* from .env: the model repo is private.
+variables: {SAM2LITE_DEVICE: cpu}    # 2 vCPU: ONNX Runtime encoder, as measured locally
 
 readme:
   title: sam2-lite
@@ -17,8 +16,8 @@ readme:
   sdk_version: 6.29.1            # the version tested locally (uv.lock)
   python_version: "3.11"         # same as the project (uv)
   app_file: app/app.py
-  license: apache-2.0            # the Space holds code; the README licenses the model and videos
-  short_description: Distilled SAM 2.1 video object tracking, faster on CPU  # max 60 chars
+  license: apache-2.0
+  short_description: Distilled SAM 2.1 video object tracking, faster on CPU
   models: [Pablopigue/sam2-lite]
   pinned: false
 
@@ -33,7 +32,7 @@ requirements:
   - omegaconf==2.3.1
   - huggingface_hub==2.0.0
   - safetensors==0.8.0
-  - onnxruntime==1.30.0          # the image encoder on CPU (D-040)
+  - onnxruntime==1.30.0          # the image encoder on CPU
   - opencv-python-headless==5.0.0.93
   - spaces==0.51.3               # @spaces.GPU is a no-op off ZeroGPU, but app.py imports it
-packages: [ffmpeg]               # apt packages: H.264 encoding for the browser (D-043)
+packages: [ffmpeg]               # apt packages: H.264 encoding for the browser

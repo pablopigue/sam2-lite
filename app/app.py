@@ -23,7 +23,7 @@ from sam2.sam2_video_predictor import SAM2VideoPredictor
 from sam2lite.demo import load_tracker, overlay_masks, read_video, track, write_mp4
 
 CFG = OmegaConf.load("configs/app.yaml")
-# Measured with 2 threads (docs D-043): only used to tell the user how long to wait.
+# Measured with 2 threads: only used to tell the user how long to wait.
 SECONDS_PER_FRAME = {"sam2-lite-mobile": 0.35, "sam2-lite": 1.9}
 EXAMPLES_DIR = Path(CFG.examples.dir)
 # Preset click of each example video, by file name (Gradio copies examples to its cache, keeping
@@ -89,7 +89,7 @@ def on_click(video: dict | None, model: str, evt: gr.SelectData):
     return draw_click(video["frames"][0], point), point, estimate(video, model)
 
 
-@spaces.GPU(duration=60)  # no effect outside ZeroGPU; there, a GPU only while this runs
+@spaces.GPU(duration=60)
 def run_tracking(frames: list[np.ndarray], point: tuple[int, int], model: str) -> list[dict]:
     # bf16 on GPU, as in the official evaluation; full precision (and ONNX Runtime) on CPU.
     with torch.autocast("cuda", dtype=torch.bfloat16, enabled=DEVICE == "cuda"):

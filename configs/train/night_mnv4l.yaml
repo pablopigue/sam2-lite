@@ -24,12 +24,12 @@ teacher:
 student_config: configs/model/student_mnv4l.yaml
 
 loss:
-  weights: [1.0, 1.0, 1.0]   # D-018
+  weights: [1.0, 1.0, 1.0]
 
 batch_size: 2
 grad_accum: 4                # effective batch 8
 grad_clip: 1.0
-freeze_bn: true              # D-019
+freeze_bn: true
 
 optim:
   lr: 3.0e-4                 # lower than the smoke test (5e-4 gave a loss spike at peak lr)

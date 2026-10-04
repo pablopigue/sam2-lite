@@ -24,12 +24,12 @@ teacher:
 student_config: configs/model/student_mnv4.yaml
 
 loss:
-  weights: [1.0, 1.0, 1.0]   # per backbone_fpn level (strides 4, 8, 16); see docs D-018
+  weights: [1.0, 1.0, 1.0]   # per backbone_fpn level (strides 4, 8, 16);
 
 batch_size: 2                # micro-batch that fits in 8 GB of VRAM
 grad_accum: 4                # effective batch = batch_size * grad_accum = 8
 grad_clip: 1.0               # max global gradient norm
-freeze_bn: true              # keep pretrained BatchNorm statistics (micro-batches of 2); D-019
+freeze_bn: true              # keep pretrained BatchNorm statistics (micro-batches of 2);
 
 optim:
   lr: 5.0e-4

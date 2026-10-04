@@ -22,7 +22,7 @@ def test_start_run_logs_config_and_git(tmp_path: Path, monkeypatch: pytest.Monke
     cfg = OmegaConf.create({"model": {"name": "teacher"}, "split": "val"})
 
     with start_run("test-exp", "test-run", cfg) as run:
-        mlflow.log_metric("JF", 89.1)  # MLflow metric names cannot contain "&"
+        mlflow.log_metric("JF", 89.1)
 
     logged = mlflow.get_run(run.info.run_id).data
     assert logged.params == {"model.name": "teacher", "split": "val"}

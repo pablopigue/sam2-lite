@@ -4,7 +4,7 @@
 #   docker run --rm -p 8000:8000 -v $PWD/checkpoints:/app/checkpoints:ro sam2-lite-api
 FROM python:3.11-slim
 
-# ffmpeg: H.264 output the browser can play (D-043); git: sam-2 is installed from GitHub.
+# ffmpeg: H.264 output the browser can play; git: sam-2 is installed from GitHub.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg git \
     && rm -rf /var/lib/apt/lists/*

@@ -1,5 +1,5 @@
 # Mobile model, step M2a: fine-tune the night1 student encoder at 576×576 input, distilling the
-# teacher at 1024 (its features area-averaged to the student's grid). See docs D-031/D-032.
+# teacher at 1024 (its features area-averaged to the student's grid).
 # Same as night1.yaml except: student_image_size, init_student, lr, warmup and total_steps.
 
 run_name: enc_r576
@@ -28,7 +28,7 @@ teacher:
 student_config: configs/model/student_mnv4.yaml
 
 loss:
-  weights: [1.0, 1.0, 1.0]   # D-018
+  weights: [1.0, 1.0, 1.0]
 
 batch_size: 2
 grad_accum: 4

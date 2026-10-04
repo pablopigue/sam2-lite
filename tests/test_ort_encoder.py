@@ -15,7 +15,7 @@ from sam2lite.export.ort_encoder import OrtImageEncoder
 from sam2lite.models.student import build_student
 
 STUDENT_CONFIG = "configs/model/student_mnv4.yaml"
-IMAGE_SIZE = 256  # small and fast; strides 4..32 still divide it
+IMAGE_SIZE = 256  # small and fast
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +43,7 @@ def test_ort_encoder_matches_pytorch_contract(encoders) -> None:
     for g, e in zip(got["backbone_fpn"], expected["backbone_fpn"], strict=True):
         assert (g - e).abs().max() / e.abs().max() < 1e-4
     for g, e in zip(got["vision_pos_enc"], expected["vision_pos_enc"], strict=True):
-        assert torch.equal(g, e)  # same module, same shapes -> identical
+        assert torch.equal(g, e)  # same module, same shapes = identical
     assert got["vision_features"] is got["backbone_fpn"][-1]  # as in ImageEncoder.forward
 
 
