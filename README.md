@@ -211,7 +211,7 @@ tests/              66 tests: contract, preprocessing, memory, losses, data, ONN
 
 ## Future work
 
-- **More distillation data:** unlabeled images or videos with a clear license and direct download; the experiments above suggest data, not model capacity, is the current limit.
+- **More distillation data:** DAVIS 2017 was used because it is the standard VOS benchmark and a direct download, but it gives only ~3.8k training frames, and the experiments suggest data, not model capacity, is the current limit. The natural next step is distilling on [SA-V](https://ai.meta.com/datasets/segment-anything-video/), the dataset SAM 2 was trained on: 50.6k training videos under CC BY 4.0, whose val and test sets the vendored evaluator already supports.
 - **Mobile, near real time (≥ 10 fps):** run on the phone's GPU/NPU in fp16/INT8 (Core ML, TFLite, ExecuTorch) instead of fp32 PyTorch on CPU; then a larger encoder and compressed memory tokens (as EdgeTAM's Spatial Perceiver), reusing this project's memory distillation pipeline.
 
 ## Related work
