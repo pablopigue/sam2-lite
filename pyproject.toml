@@ -3,8 +3,8 @@ name = "sam2lite"
 version = "0.1.0"
 description = "Faster SAM 2.1 on CPU by distilling its image encoder into a mobile backbone"
 readme = "README.md"
-license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license = "Apache-2.0 AND BSD-3-Clause AND MIT"  # BSD-3-Clause and MIT: the vendored evaluator
+license-files = ["LICENSE", "NOTICE", "src/sam2lite/eval/third_party/LICENSE*"]
 authors = [
     { name = "pablopigue", email = "pablopigueesp@gmail.com" }
 ]
