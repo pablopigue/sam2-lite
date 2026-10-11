@@ -46,6 +46,10 @@ def readme(cfg: DictConfig) -> str:
         "Click an object in the first frame of a short video and it is tracked through the video "
         "with sam2-lite: SAM 2.1 Hiera-tiny with a distilled MobileNetV4 image encoder and a "
         f"memory attention that attends to 3 frames. Model: {model}.\n\n"
+        "sam2-lite is built and measured for **CPU** (2.1× faster than SAM 2.1 Hiera-tiny on a "
+        "laptop CPU). This Space runs on a shared GPU (ZeroGPU) because that is the free hardware "
+        "Hugging Face allows this account, so its speed is not the CPU latency of the model "
+        "card.\n\n"
         "sam2-lite is an independent project; it is not affiliated with, endorsed by or "
         "sponsored by Meta.\n\n"
         # One license per part: the Space's license tag covers its code only.
@@ -53,7 +57,10 @@ def readme(cfg: DictConfig) -> str:
         "- **Code:** Apache License 2.0 (`LICENSE`); `NOTICE` gives every part its license.\n"
         f"- **Model** ({model}): CC BY-NC 4.0, non-commercial research use only.\n"
         "- **Example videos** (`app/examples/`): CC BY 2.0 and CC BY 3.0, credits in "
-        "`app/examples/ATTRIBUTION.md`.\n"
+        "`app/examples/ATTRIBUTION.md`.\n\n"
+        "## Privacy\n\n"
+        "Uploaded videos are deleted as soon as they are read; their frames and the results "
+        "within 10 minutes. Do not upload videos of people without their consent.\n"
     )
     return f"---\n{header}---\n\n{body}"
 

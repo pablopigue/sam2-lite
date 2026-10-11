@@ -9,7 +9,9 @@
 
 **Model:** [Pablopigue/sam2-lite](https://huggingface.co/Pablopigue/sam2-lite) on the Hugging Face Hub (safetensors bundle + ONNX encoders).
 
-**Try it locally:** a Gradio app (`make app`), an HTTP API with a minimal web page (`make api`) and a CPU Docker image (`make docker-build && make docker-run`); see [Deployment](#deployment). A Hugging Face Space for the demo is prepared, but hosting a Gradio Space needs a paid plan, so it is not online.
+**Try it online:** [Pablopigue/sam2-lite-demo](https://huggingface.co/spaces/Pablopigue/sam2-lite-demo), a Hugging Face Space. sam2-lite is built and measured for CPU, but the Space runs on a shared GPU (ZeroGPU), the free hardware Hugging Face allows this account, so its speed is not the CPU latency reported below.
+
+**Try it locally:** a Gradio app (`make app`), an HTTP API with a minimal web page (`make api`) and a CPU Docker image (`make docker-build && make docker-run`); see [Deployment](#deployment).
 
 ## The idea
 
@@ -136,7 +138,7 @@ The encoder gets faster but the pipeline only gains 5-8 %: the memory attention,
 - **Gradio app** (`make app`): upload a short video, click the object, pick sam2-lite or sam2-lite-mobile, get an H.264 video; licensed examples and the hard case above.
 - **HTTP API** (`make api`, FastAPI): `POST /track` (video + click) → mp4, `GET /health`, and a minimal web page at `/`.
 - **Docker** (`make docker-build && make docker-run`): CPU-only image of the API; weights are mounted or downloaded, never baked into the image.
-- **Hugging Face Space:** prepared (`scripts/build_space.py`: CPU Basic, or ZeroGPU through `SAM2LITE_DEVICE=cuda` and `@spaces.GPU`) but paused: Gradio Spaces need a paid plan on this account.
+- **[Hugging Face Space](https://huggingface.co/spaces/Pablopigue/sam2-lite-demo)** (`scripts/build_space.py`): the same Gradio app on ZeroGPU (`SAM2LITE_DEVICE=cuda`, `@spaces.GPU`, PyTorch encoder), the free hardware available to this account; on CPU it would run the ONNX encoder as measured above. Uploaded videos are deleted once read, and frames and results within 10 minutes.
 
 ## MLOps and engineering
 

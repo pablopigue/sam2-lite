@@ -12,6 +12,7 @@ import re
 import tempfile
 import time
 from pathlib import Path
+from unittest import mock
 
 import gradio as gr
 import numpy as np
@@ -33,6 +34,10 @@ HARD = next(v for v in CFG.examples.videos if v.get("hard"))
 # "cpu" by default (the measured deployment target); "cuda" for a local GPU or a ZeroGPU Space.
 DEVICE = os.environ.get("SAM2LITE_DEVICE", "cpu")
 _trackers: dict[str, SAM2VideoPredictor] = {}
+# Users' videos may be personal data: nothing is kept longer than this (stated in LIMITS).
+KEEP_SECONDS = 600
+OUTPUT_DIR = Path(tempfile.gettempdir()) / "sam2lite_results"
+OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def get_tracker(model: str) -> SAM2VideoPredictor:
@@ -43,8 +48,9 @@ def get_tracker(model: str) -> SAM2VideoPredictor:
 
 
 if DEVICE == "cuda":  # ZeroGPU wants models placed on cuda at start-up, not inside a request
-    for _name in CFG.models:
-        get_tracker(_name)
+    with mock.patch("torch.cuda.is_available", return_value=False):
+        for _name in CFG.models:
+            get_tracker(_name)
 
 
 def draw_click(frame: np.ndarray, point: tuple[int, int]) -> np.ndarray:
@@ -75,8 +81,9 @@ def on_upload(video_path: str | None, model: str):
     frames, fps = read_video(video_path, CFG.max_seconds, CFG.target_fps, CFG.max_side)
     video = {"frames": frames, "fps": fps}
     point = EXAMPLE_CLICK.get(Path(video_path).stem)
-    if point is not None:
+    if point is not None:  # an example: its cached copy is reused, keep it
         return draw_click(frames[0], point), video, point, estimate(video, model)
+    Path(video_path).unlink(missing_ok=True)  # a user's upload: the frames are in memory now
     info = f"{len(frames)} frames at {fps:.1f} fps. Click the object to track."
     return frames[0], video, None, info
 
@@ -102,7 +109,10 @@ def on_track(video: dict | None, point: tuple[int, int] | None, model: str):
     start = time.perf_counter()
     masks = run_tracking(video["frames"], point, model)  # drawing + encoding stay off the GPU
     frames = [overlay_masks(f, m) for f, m in zip(video["frames"], masks, strict=True)]
-    out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
+    for old in OUTPUT_DIR.glob("*.mp4"):  # users' results: kept at most KEEP_SECONDS
+        if time.time() - old.stat().st_mtime > KEEP_SECONDS:
+            old.unlink(missing_ok=True)
+    out_path = tempfile.NamedTemporaryFile(suffix=".mp4", dir=OUTPUT_DIR, delete=False).name
     write_mp4(frames, video["fps"], out_path)
     seconds = time.perf_counter() - start
     return out_path, f"{model}: {len(frames)} frames · {seconds / len(frames):.2f} s per frame."
@@ -163,6 +173,8 @@ LIMITS = f"""
 - **Model license:** CC BY-NC 4.0, non-commercial research use only. Contains SAM 2.1 weights by
   Meta (Apache 2.0, memory attention modified); encoder pretrained on ImageNet-1k; distilled on
   DAVIS 2017 (CC BY-NC 4.0). App code: Apache 2.0; example videos: CC BY (credits below).
+- **Privacy:** uploaded videos are deleted as soon as they are read; their frames and the results
+  within {KEEP_SECONDS // 60} min. Do not upload videos of people without their consent.
 """
 FOOTER = (
     '<div id="footer">sam2-lite is an independent project; it is not affiliated with, endorsed '
@@ -178,9 +190,14 @@ def section(title: str) -> None:
     gr.HTML(f'<div class="section-title">{title}</div>')
 
 
-with gr.Blocks(title="sam2-lite · fast video object tracking") as demo:
+# Gradio's own copies (uploads, returned videos) are purged on the same schedule as OUTPUT_DIR.
+with gr.Blocks(
+    title="sam2-lite · fast video object tracking", delete_cache=(KEEP_SECONDS, KEEP_SECONDS)
+) as demo:
     gr.HTML(HERO)
-    video_state, point_state = gr.State(), gr.State()
+    # A session's frames live in memory: freed when the tab closes or after KEEP_SECONDS.
+    video_state = gr.State(time_to_live=KEEP_SECONDS)
+    point_state = gr.State(time_to_live=KEEP_SECONDS)
     with gr.Row(equal_height=False):
         with gr.Column(scale=1):
             with gr.Group(elem_classes="card"):
